@@ -13,7 +13,7 @@ HPPFILES=$(wildcard *.hpp)
 CPPFILES=retarget.cpp devices.cpp boot.cpp main.cpp
 
 # Update paths below to reflect your file system
-INCLUDES=-Ipath/to/Kvasir/Lib -I/path/to/boost/include/boost-1_xx
+INCLUDES=-I../../Kvasir/Lib -I/mingw64/arm-none-eabi/include -Iext
 
 # Following Boost library definitions are not required if you use my
 # modified rational implementation.
