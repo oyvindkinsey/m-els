@@ -11,11 +11,11 @@ struct Configuration {
   gearing_ratio_t encoder_gearing{1, 1};
   
   uint16_t stepper_full_steps{200u};
-  uint16_t stepper_micro_steps{8};
+  uint16_t stepper_micro_steps{10};
   gearing_ratio_t stepper_gearing{1, 1};
   
-  unsigned step_pulse_ns{1200};
-  unsigned step_dir_hold_ns{400};
+  unsigned step_pulse_ns{2500};
+  unsigned step_dir_hold_ns{5000};
   bool invert_step_pin{false};
   bool invert_dir_pin{true};
   
