@@ -1,8 +1,12 @@
 #pragma once
 
-namespace gear {
+#include <stdint.h>
 
-  struct State {
+namespace gear
+{
+
+  struct State
+  {
     int D, N; // pulse ratio : N/D
     int err = 0;
     int output_position = 0;
@@ -10,36 +14,44 @@ namespace gear {
 
   volatile State state = {4, 1};
 
-  struct Jump {
+  struct Jump
+  {
     uint16_t count;
     uint16_t delta;
     int error;
   };
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wnarrowing"  
+#pragma GCC diagnostic ignored "-Wnarrowing"
   // Narrowing comes due to integer promotion in arithmetic operations
   // k, the encoder count delta for the next step pulse, should fit within a short integer
 
-  inline Jump next_jump_forward(int d, int n, int e, uint16_t count) {
+  inline Jump next_jump_forward(int d, int n, int e, uint16_t count)
+  {
     uint16_t k = (d - 2 * e + 2 * n - 1) / (2 * n);
     return {count + k, k, e + k * n - d};
   }
 
-  inline Jump next_jump_reverse(int d, int n, int e, uint16_t count) {
+  inline Jump next_jump_reverse(int d, int n, int e, uint16_t count)
+  {
     uint16_t k = 1 + ((d + 2 * e) / (2 * n));
     return {count - k, k, e - k * n + d};
   }
 
-  struct Range {
+  struct Range
+  {
     Jump next{}, prev{};
 
-    void next_jump(bool dir, uint16_t count) {
+    void next_jump(bool dir, uint16_t count)
+    {
       int d = state.D, n = state.N, e = state.err;
-      if (!dir) {
+      if (!dir)
+      {
         next = next_jump_forward(d, n, e, count);
         prev = {count - 1, 1u, next.error + d - n};
-      } else {
+      }
+      else
+      {
         next = next_jump_reverse(d, n, e, count);
         prev = {count + 1, 1u, next.error - d + n};
       }
@@ -50,17 +62,20 @@ namespace gear {
   Range range;
 
   template <typename RationalNumber>
-  void configure(const RationalNumber& ratio, uint16_t start_position) {
+  void configure(const RationalNumber &ratio, uint16_t start_position)
+  {
     state.D = ratio.denominator();
     state.N = ratio.numerator();
     state.err = 0;
     range.next = next_jump_forward(ratio.denominator(), ratio.numerator(), 0, start_position);
     range.prev = next_jump_reverse(ratio.denominator(), ratio.numerator(), 0, start_position);
   }
-  
-  inline unsigned phase_delay(uint16_t input_period, int e) {
-    if (e < 0) e = -e;
+
+  inline unsigned phase_delay(uint16_t input_period, int e)
+  {
+    if (e < 0)
+      e = -e;
     return (input_period * e) / (state.N);
   }
-  
+
 }

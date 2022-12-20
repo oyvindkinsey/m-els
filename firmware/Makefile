@@ -10,7 +10,7 @@ LDSCRIPTS=-L. -Lldscripts -T gcc.ld
 LFLAGS=$(USE_NANO) $(USE_NOHOST) $(LDSCRIPTS) $(GC) $(MAP)
 
 HPPFILES=$(wildcard *.hpp)
-CPPFILES=retarget.cpp devices.cpp boot.cpp main.cpp
+CPPFILES=boot.cpp main.cpp
 
 # Update paths below to reflect your file system
 INCLUDES=-I../../Kvasir/Lib -I/mingw64/arm-none-eabi/include -Iext

@@ -9,7 +9,7 @@ namespace threads {
   // * complete the list (source?) and add support for reading/writing on flash memory
   // * add support for filtering (wrt unit type, etc.)
   const thread pitch_list[] = {
-    {"R1:1", 15_tpi, true}, // same pitch as demo leadscrew definition -> one to one rotation ratio
+    {"R1:1", 2.00_mm, true}, // same pitch as demo leadscrew definition -> one to one rotation ratio
     {"1/4 ", 20_tpi},
     {"1/4 ", 28_tpi},
     {"5/16", 18_tpi},

@@ -1,15 +1,13 @@
 #pragma once
 
-#include <cstdio>
-
-#include <string_view>
-#include <array>
-#include <string>
 #include <algorithm>
-#include <type_traits>
-
+#include <array>
 #include <boost/rational_minimal.hpp>
+#include <cstdio>
 #include <numeric>
+#include <string_view>
+#include <string>
+#include <type_traits>
 
 namespace threads {
   //using ratio_t = boost::rational<uint64_t>;
