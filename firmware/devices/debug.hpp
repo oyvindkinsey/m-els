@@ -1,24 +1,15 @@
-
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
-
-#include "../constants.hpp"
+#include "stm32f103xb.h"
 
 namespace devices {
     struct debug {
 
         static void init() {
-            using namespace constants;
-            using namespace Kvasir;
-
-            apply(write(pins::led_pin::cr::mode, gpio::PinMode::Output_2Mhz));
+            GPIOC->CRH &= ~GPIO_CRH_CNF13_Msk | GPIO_CRH_MODE13_Msk; // general purpose output push-pull
+            GPIOC->CRH |= GPIO_CRH_MODE13_1; // Output mode, max speed 2MHz
         }
 
         static void toggle_led() {
-            using namespace constants;
-
-            bool led = apply(read(pins::led_pin::odr));
-            apply(write(pins::led_pin::odr, !led));
+            GPIOC->ODR ^= GPIO_ODR_ODR13_Msk;
         }
     };
 }
