@@ -11,11 +11,10 @@
 #include "components/timer.hpp"
 #include "configuration.hpp"
 #include "devices/debug.hpp"
-#include "devices/encoder_pulse_duration.hpp"
 #include "devices/encoder.hpp"
 #include "devices/hmi.hpp"
 #include "devices/rpm_counter.hpp"
-#include "devices/step_gen.cpp"
+#include "devices/step_gen.hpp"
 #include "thread_list.hpp"
 #include "threads.hpp"
 
@@ -77,7 +76,7 @@ extern "C"
       encoder::trigger_clear();
       state.err = range.next.error;
       range.next_jump(dir, enc);
-      step_gen::set_delay(phase_delay(encoder_pulse_duration::last_duration(), range.next.error));
+      step_gen::set_delay(phase_delay(encoder::last_duration(), range.next.error));
       encoder::trigger_restore();
     } else { // Change direction, setup delayed pulse and do manual trigger
       dir = !dir;
@@ -90,7 +89,7 @@ extern "C"
   }
 
   void TIM2_IRQHandler() {
-    devices::encoder_pulse_duration::process_interrupt();
+    devices::encoder::process_interrupt();
   }
 
   void TIM3_IRQHandler() {
@@ -123,8 +122,6 @@ int main() {
 
   encoder::init();
   encoder::update_channels(gear::range.next.count, gear::range.prev.count);
-
-  encoder_pulse_duration::init();
 
   using display = hmi<>;
   display::init();

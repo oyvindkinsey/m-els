@@ -4,6 +4,7 @@
 namespace devices {
 
     struct step_gen {
+
         static constexpr uint64_t ClockFreq = constants::CPU_Clock_Freq_Hz;
         static constexpr uint8_t ClockDiv = 2;
 
@@ -132,4 +133,6 @@ namespace devices {
             }
         }
     };
+
+    step_gen::State step_gen::state = {};
 }
