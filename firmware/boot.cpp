@@ -1,52 +1,45 @@
-#include "interrupts.hpp"
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
+#include "stm32f103xb.h"
 
 extern "C" void SystemInit() {
-  using namespace Kvasir;
-  // Clock setup
-  // Switch to HSE and Use pll clock
-  apply(set(RccCr::hseon));
-  for (auto hse_ready = read(RccCr::hserdy); !apply(hse_ready);)
-    ;
-  apply(
-    write(RccCfgr::hpre, 0),    // div1
-    write(RccCfgr::ppre2, 0),   // apb2 : div1
-    write(RccCfgr::ppre1, 4),   // apb1 : div2
-    set(RccCfgr::pllsrc),       // source HSE
-    write(RccCfgr::pllmul, 0x7) // pllmul:9
-  );
-  apply(set(RccCr::pllon)); // enable pll
-  for (auto pllrdy = read(RccCr::pllrdy); !apply(pllrdy);)
-    ;
+  RCC->CR |= RCC_CR_HSEON; // HSE clock enable
+  while (!(RCC->CR & RCC_CR_HSERDY)) {} // wait for HSERDY flag to be set 
 
-  apply(write(FlashAcr::latency, 2u)); // Flash wait state 2
+  RCC->CFGR &= ~RCC_CFGR_HPRE_Msk; // set the AHB prescaler to 0, not divided
+  RCC->CFGR &= ~RCC_CFGR_PPRE2_Msk; // set the APB high-speed prescaler to 0, not divided 
+  RCC->CFGR &= ~RCC_CFGR_PPRE1_Msk; // reset 
+  RCC->CFGR |= RCC_CFGR_PPRE1_DIV4; // set the  APB low-speed prescaler to 4
+  RCC->CFGR |= RCC_CFGR_PLLSRC; //  select PREDIV1 as the PLL input clock
+  RCC->CFGR &= ~RCC_CFGR_PLLMULL_Msk; // reset
+  RCC->CFGR |= RCC_CFGR_PLLMULL9; // PLL input clock x 9
 
-  apply(write(RccCfgr::sw, RccCfgr::sw_val::pll)); // Clock switch : source PLL
-  for (auto swrdy = read(RccCfgr::sws); apply(swrdy) != RccCfgr::sw_val::pll;)
-    ;
+  RCC->CR |= RCC_CR_PLLON; // PLL enable
+  while (!(RCC->CR & RCC_CR_PLLRDY)) {} // wait for PLLRDY flag to be set 
 
-  // Peripheral setup
-  // enable clocks
-  apply(
-    set(RccApb2enr::iopcen),
-    set(RccApb2enr::iopben),
-    set(RccApb2enr::iopaen),
-    set(RccApb2enr::afioen),
-    set(RccApb1enr::tim4en),
-    set(RccApb1enr::tim3en),
-    set(RccApb1enr::tim2en),
-    set(RccApb2enr::tim1en),
-    set(RccApb2enr::usart1en),
-    set(RccApb1enr::usart2en),
-    set(RccApb1enr::i2c2en),
-    set(RccAhbenr::dma1en));
+  FLASH->ACR &= ~FLASH_ACR_LATENCY_Msk; // reset 
+  FLASH->ACR |= FLASH_ACR_LATENCY_1; // set LATENCY to two wait states, 48MHz < SYSCLK ≤ 72MHz
 
-  // Systick timer
-  apply(
-    write(Stk_Load::Reload, 9000 - 1), // 1ms timer
-    clear(Stk_Ctrl::Clksource),
-    set(Stk_Ctrl::TickInt),
-    set(Stk_Ctrl::Enable),
-    write(Stk_Priority::pri, interrupts::priorities(IRQ::systick_irqn)));
+  RCC->CFGR &= ~RCC_CFGR_SW_Msk;
+  RCC->CFGR |= RCC_CFGR_SW_PLL; // PLL selected as system clock 
+  while (!(RCC->CFGR & RCC_CFGR_SWS_PLL)) {} // wait for the system clock to switch to PLL 
+
+  // enable peripherals
+  RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+  RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+  RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+  RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+  RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+  RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+  RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+
+  SysTick->LOAD &= ~SysTick_LOAD_RELOAD_Msk; // disable the systick timer
+  SysTick->LOAD |= 9000 - 1; // set SysTick timer to 1ms
+  SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk; // use external clock (sets div = 8)
+  SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; // enable the systick exception request 
+  SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk; // enable SysTick 
+
+  NVIC_SetPriority(SysTick_IRQn, 15); // set the system priority to 15 
 }

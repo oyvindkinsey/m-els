@@ -13,7 +13,7 @@ HPPFILES=$(wildcard *.hpp)
 CPPFILES=boot.cpp main.cpp
 
 # Update paths below to reflect your file system
-INCLUDES=-I../../Kvasir/Lib -I/mingw64/arm-none-eabi/include -Iext
+INCLUDES=-I../../Kvasir/Lib -I/mingw64/arm-none-eabi/include -Iext -I../../STM32CubeF1/Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../../STM32CubeF1/Drivers/CMSIS/Include
 
 # Following Boost library definitions are not required if you use my
 # modified rational implementation.
