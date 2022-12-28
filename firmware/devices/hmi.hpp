@@ -1,8 +1,4 @@
-
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
-#include <string_view>
-
+#include "stm32f103xb.h"
 #include "../constants.hpp"
 
 namespace devices {
@@ -10,27 +6,30 @@ namespace devices {
 
   struct hmi {
 
-    // TODO: usarts need a generic interface
-    using pin_TX = constants::pins::uart1_remapped_TX;
-    using pin_RX = constants::pins::uart1_remapped_RX;
-
     static void init() {
       using namespace Kvasir;
-      apply(set(Kvasir::AfioMapr::usart1Remap));
-      apply(write(pin_TX::cr::mode, gpio::PinMode::Output_2Mhz),
-        write(pin_TX::cr::cnf, gpio::PinConfig::Output_alternate_push_pull),
-        write(pin_RX::cr::mode, gpio::PinMode::Input),
-        write(pin_RX::cr::cnf, gpio::PinConfig::Input_floating));
-      apply(write(Usart1Brr::brr_12_4, constants::usart_brr_val(ClkFreq, BaudRate)),
-        set(Usart1Cr1::rxneie),
-        set(Usart1Cr1::re),
-        set(Usart1Cr1::te));
-      apply(set(Usart1Cr1::ue));
+      AFIO->MAPR |= AFIO_MAPR_USART1_REMAP;
+
+      // tx
+      GPIOB->CRL &= ~(GPIO_CRL_CNF6_Msk | GPIO_CRL_MODE6_Msk); // reset
+      GPIOB->CRL |= GPIO_CRL_CNF6_1; // Alternate function output Push-pull
+      GPIOB->CRL |= GPIO_CRL_MODE6_1; // Output mode, max speed 2MHz
+
+      // rx
+      GPIOB->CRL &= ~(GPIO_CRL_CNF7_Msk | GPIO_CRL_MODE7_Msk); // reset
+      GPIOB->CRL |= GPIO_CRL_CNF6_0; // Floating input 
+
+      // usart
+      USART1->BRR = ClkFreq / BaudRate; // baud rate register
+      USART1->CR1 |= USART_CR1_RXNEIE; // RXNE interrupt enable
+      USART1->CR1 |= USART_CR1_RE; // Receiver enable
+      USART1->CR1 |= USART_CR1_TE; // Transmitter enable
+      USART1->CR1 |= USART_CR1_UE; // USART enable
+
     }
 
     static inline void process_interrupt() {
-      using namespace Kvasir;
-      auto c = apply(read(Usart1Dr::dr));
+      auto c = USART1->DR;
       // todo: handle c
     }
 
@@ -53,10 +52,8 @@ namespace devices {
     }
 
     static inline void send_char(char c) {
-      using namespace Kvasir;
-      while (!apply(read(Usart1Sr::txe)))
-        ;
-      apply(write(Usart1Dr::dr, c));
+      while (!(USART1->SR & USART_SR_TXE)) {}
+      USART1->DR = c;
     }
 
     static void send_string_packet(const std::string_view& s) {
