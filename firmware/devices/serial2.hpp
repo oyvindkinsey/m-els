@@ -1,30 +1,27 @@
-
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
-
+#include "stm32f103xb.h"
 #include "../constants.hpp"
 
 namespace devices {
   template <unsigned ClkFreq = constants::CPU_Clock_Freq_Hz / 2, unsigned BaudRate = 115200>
   struct Serial2 {
-    using pin_TX = constants::pins::uart2_TX;
-    // using pin_RX = constants::pins::uart2_RX;
 
     static void init() {
-      // Pins
-      using namespace Kvasir;
-      apply(write(pin_TX::cr::mode, gpio::PinMode::Output_2Mhz),
-        write(pin_TX::cr::cnf, gpio::PinConfig::Output_alternate_push_pull));
-      apply(write(Usart2Brr::brr_12_4, mcu::usart_brr_val(ClkFreq, BaudRate)),
-        set(Usart2Cr1::te));
-      apply(set(Usart2Cr1::ue));
+
+      // tx
+      GPIOA->CRL &= ~(GPIO_CRL_CNF2_Msk | GPIO_CRL_MODE2_Msk); // reset
+      GPIOA->CRL |= GPIO_CRL_CNF2_1; // Alternate function output Push-pull
+      GPIOA->CRL |= GPIO_CRL_MODE2_1; // Output mode, max speed 2MHz
+
+      // usart
+      USART2->BRR = ClkFreq / BaudRate; // baud rate register
+      UlART2->CR1 |= USART_CR1_TE; // Transmitter enable
+      USART2->CR1 |= USART_CR1_UE; // USART enable
+
     }
 
     static void put_char(char c) {
-      using namespace Kvasir;
-      while (!apply(read(Usart2Sr::txe)))
-        ;
-      apply(write(Usart2Dr::dr, c));
+      while (!(USART2->SR & USART_SR_TXE)) {}
+      USART2->DR = c;
     }
   };
 }
