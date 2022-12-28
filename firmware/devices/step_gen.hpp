@@ -1,10 +1,5 @@
-
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
-#include <Register/Utility.hpp>
-
+#include "stm32f103xb.h"
 #include "../constants.hpp"
-#include "../interrupts.hpp"
 
 namespace devices {
 
@@ -13,9 +8,6 @@ namespace devices {
         static constexpr uint8_t ClockDiv = 2;
 
         static constexpr unsigned int min_count = constants::min_timer_capture_count; // required by timer
-
-        using step_pin = constants::pins::step_pin;
-        using dir_pin = constants::pins::dir_pin;
 
         struct start_stop {
             volatile uint16_t cnt_start{}, cnt_stop{};
@@ -32,30 +24,45 @@ namespace devices {
         static State state;
 
         static void init() {
-            using namespace Kvasir;
-            // Port
-            apply(write(step_pin::cr::mode, gpio::PinMode::Output_2Mhz),
-                write(step_pin::cr::cnf, gpio::PinConfig::Output_alternate_push_pull),
-                write(dir_pin::cr::mode, gpio::PinMode::Output_2Mhz),
-                write(dir_pin::cr::cnf, gpio::PinConfig::Output_push_pull));
+            // step
+            GPIOB->CRL &= ~(GPIO_CRL_CNF0_Msk | GPIO_CRL_MODE0_Msk); // reset
+            GPIOB->CRL |= GPIO_CRL_CNF0_1; // Alternate function output Push-pull
+            GPIOB->CRL |= GPIO_CRL_MODE0_1; // Output mode, max speed 2MHz
+
+            // dir
+            GPIOB->CRL &= ~(GPIO_CRL_CNF1_Msk | GPIO_CRL_MODE1_Msk); // reset
+            GPIOB->CRL |= GPIO_CRL_MODE1_1; // Output mode, max speed 2MHz
+
             // Timer
-            apply(set(Tim3Cr1::opm),
-                write(Tim3Psc::psc, ClockDiv - 1),
-                write(Tim3Ccmr2Output::oc3m, 0b111), // PWM mode 2
-                write(Tim3Smcr::sms, 0b110),         // Trigger mode
-                write(Tim3Smcr::ts, 0),              // ITR0 - tim1
-                set(Tim3Ccer::cc3e),
-                clear(Tim3Sr::uif),
-                set(Tim3Dier::uie) // enable update interrupt
-            );
-            interrupts::enable<IRQ::tim3_irqn>();
+            TIM3->CR1 |= TIM_CR1_OPM; // one pulse mode
+            TIM3->PSC = ClockDiv - 1; // set the prescaler
+            TIM3->CCMR2 &= ~TIM_CCMR2_OC3M_Msk;
+            TIM3->CCMR2 |= TIM_CCMR2_OC3M_0 | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2; // PWM mode 2
+            TIM3->SMCR &= ~TIM_SMCR_SMS_Msk;
+            TIM3->SMCR |= TIM_SMCR_SMS_1 | TIM_SMCR_SMS_2; // Trigger mode
+            TIM3->SMCR &= ~TIM_SMCR_TS_Msk; // Internal Trigger 0 (ITR0), shared with tim1
+            TIM3->CCER |= TIM_CCER_CC3E; // Capture/Compare 3 output enable
+            TIM3->SR &= ~TIM_SR_UIF_Msk; // Clear the update interrupt flag
+            TIM3->DIER |= TIM_DIER_UIE; // Update interrupt enabled
+
+            NVIC_EnableIRQ(TIM3_IRQn);
         }
 
         static void configure(unsigned int dir_setup_ns, unsigned int step_pulse_ns,
             bool invert_step, bool invert_dir) {
-            apply(write(Kvasir::Tim3Ccer::cc3p, invert_step));
+            if (invert_step) {
+                TIM3->CCER |= TIM_CCER_CC3P;
+            } else {
+
+                TIM3->CCER &= ~TIM_CCER_CC3P;
+            }
+
             state.direction_polarity = invert_dir;
-            apply(write(dir_pin::odr, state.direction ^ state.direction_polarity));
+            if (state.direction ^ state.direction_polarity) {
+                GPIOB->ODR |= GPIO_ODR_ODR1;
+            } else {
+                GPIOB->ODR &= ~GPIO_ODR_ODR1;
+            }
 
             constexpr uint64_t TimerFreq = ClockFreq / ClockDiv;
             constexpr uint64_t nanosec = constants::onesec_in_ns.count();
@@ -75,11 +82,16 @@ namespace devices {
 
         static void change_direction(bool new_dir) {
             state.direction = new_dir;
-            using namespace Kvasir;
-            apply(write(dir_pin::odr, new_dir ^ state.direction_polarity));
-            apply(clear(Tim3Ccmr2Output::oc3fe),
-                write(Tim3Ccr3::ccr3, state.counts_reverse.cnt_start),
-                write(Tim3Arr::arr, state.counts_reverse.cnt_stop));
+            if (new_dir ^ state.direction_polarity) {
+                GPIOB->ODR |= GPIO_ODR_ODR1;
+            } else {
+                GPIOB->ODR &= ~GPIO_ODR_ODR1;
+            }
+
+
+            TIM3->CCMR2 &= ~TIM_CCMR2_OC3FE_Msk; // output compare 3 fast disable
+            TIM3->CCR3 = state.counts_reverse.cnt_start; // load new capture/compare value
+            TIM3->ARR = state.counts_reverse.cnt_stop; //  load the new reload value
         }
 
         static void set_delay(unsigned delay_count) {
@@ -103,21 +115,20 @@ namespace devices {
         }
 
         static inline void process_interrupt() {
-            apply(clear(Kvasir::Tim3Sr::uif));
+            TIM3->SR &= ~TIM_SR_UIF_Msk;
             setup_next_pulse();
         }
 
     private:
         static void setup_next_pulse() {
-            using namespace Kvasir;
             if (state.delayed_pulse) {
-                apply(clear(Tim3Ccmr2Output::oc3fe),
-                    write(Tim3Ccr3::ccr3, state.counts_delayed.cnt_start),
-                    write(Tim3Arr::arr, state.counts_delayed.cnt_stop));
+                TIM3->CCMR2 &= ~TIM_CCMR2_OC3FE_Msk; // output compare 3 fast disable
+                TIM3->CCR3 = state.counts_delayed.cnt_start; // load new capture/compare value
+                TIM3->ARR = state.counts_delayed.cnt_stop; //  load the new reload value
             } else {
-                apply(set(Tim3Ccmr2Output::oc3fe), // enable fast enable
-                    write(Tim3Ccr3::ccr3, 1),    // For some reason 0 does not work
-                    write(Tim3Arr::arr, state.counts_step));
+                TIM3->CCMR2 |= TIM_CCMR2_OC3FE; // enable fast enable
+                TIM3->CCR3 = 1; // For some reason 0 does not work
+                TIM3->ARR = state.counts_step;
             }
         }
     };
