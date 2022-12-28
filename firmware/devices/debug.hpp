@@ -4,21 +4,17 @@
 
 #include "../constants.hpp"
 
-namespace devices
-{
-    struct debug
-    {
+namespace devices {
+    struct debug {
 
-        static void init()
-        {
+        static void init() {
             using namespace constants;
             using namespace Kvasir;
 
             apply(write(pins::led_pin::cr::mode, gpio::PinMode::Output_2Mhz));
         }
 
-        static void toggle_led()
-        {
+        static void toggle_led() {
             using namespace constants;
 
             bool led = apply(read(pins::led_pin::odr));

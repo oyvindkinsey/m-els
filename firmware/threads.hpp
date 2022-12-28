@@ -14,19 +14,19 @@ namespace threads {
   using Rational = boost::rational<unsigned>;
 
   constexpr auto tpi_pitch = [](auto tpi) -> Rational {
-    return {127, 5 * tpi};
+    return { 127, 5 * tpi };
   };
-  
+
   enum class pitch_type {
     mm,
     tpi,
   };
-  
+
   struct pitch_info {
     std::string_view pitch_str;
     Rational value;
     pitch_type type;
-    
+
     std::string_view unit() const {
       if (type == pitch_type::mm)
         return "mm";
@@ -38,9 +38,9 @@ namespace threads {
   struct thread {
     std::string_view name;
     pitch_info pitch;
-    bool is_custom{false};
-    
-    char * description_c_str(char *buf) const {
+    bool is_custom{ false };
+
+    char* description_c_str(char* buf) const {
       buf = std::copy(name.begin(), name.end(), buf);
       *buf++ = ' ';
       buf = std::copy(pitch.pitch_str.begin(), pitch.pitch_str.end(), buf);
@@ -75,27 +75,27 @@ namespace threads {
     constexpr Rational decimal_to_rational(std::string_view decimal) {
       auto i_dot = decimal.find('.');
       if (i_dot == decimal.npos) {
-        return {sv_to_unsigned(decimal), 1};
+        return { sv_to_unsigned(decimal), 1 };
       } else {
         auto fraction = decimal;
         fraction.remove_prefix(i_dot + 1);
         auto denom = pow10(fraction.size());
         decimal.remove_suffix(decimal.size() - i_dot);
         auto num = sv_to_unsigned(decimal) * denom + sv_to_unsigned(fraction);
-        return {num, denom};
+        return { num, denom };
       }
     }
   }
 
   inline namespace literals {
     constexpr pitch_info operator"" _mm(const char* pitch) {
-      return {pitch, detail::decimal_to_rational(pitch), pitch_type::mm};
+      return { pitch, detail::decimal_to_rational(pitch), pitch_type::mm };
     }
 
     constexpr pitch_info operator"" _tpi(const char* pitch) {
       auto r = detail::decimal_to_rational(pitch);
       // TPI = 1 inch/#Threads : 1 inch=25.4mm = 127 / 5 mm
-      return {pitch, {127 * r.denominator(), 5 * r.numerator()}, pitch_type::tpi};
+      return { pitch, {127 * r.denominator(), 5 * r.numerator()}, pitch_type::tpi };
     }
   }
 

@@ -3,15 +3,12 @@
 #include <Chip/STM32F103xx.hpp>
 #include <Register/Register.hpp>
 
-namespace interrupts
-{
+namespace interrupts {
 
     // Static (i.e. compile time) map of used IRQs and their values
     // if you are getting a compile time error, you might be missing an entry.
-    constexpr uint8_t priorities(Kvasir::nvic::irq_number_t irq)
-    {
-        switch (irq)
-        {
+    constexpr uint8_t priorities(Kvasir::nvic::irq_number_t irq) {
+        switch (irq) {
         case Kvasir::IRQ::tim2_irqn:
             return 1;
         case Kvasir::IRQ::tim1_cc_irqn:
@@ -26,8 +23,7 @@ namespace interrupts
     };
 
     template <Kvasir::nvic::irq_number_t irq_n>
-    inline void enable()
-    {
+    inline void enable() {
         using irq = Kvasir::nvic::irq<irq_n>;
         apply(
             write(irq::setena, true),

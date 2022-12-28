@@ -27,22 +27,18 @@
 #include "devices/serial.hpp"
 #endif
 
-namespace systick_state
-{
+namespace systick_state {
   volatile uint8_t rpm_sample_prescale_count = 0;
 }
 
-namespace ui
-{
+namespace ui {
   volatile bool rpm_update = false;
   volatile bool rpm_report = false;
 }
 
-namespace control
-{
+namespace control {
 
-  enum class State : uint8_t
-  {
+  enum class State: uint8_t {
     stopped,
     in_sync,
     ramping,
@@ -53,52 +49,41 @@ namespace control
 
 extern "C"
 { // interrupt handlers
-  void SysTick_Handler()
-  { // Called every 1 ms
+  void SysTick_Handler() { // Called every 1 ms
     timer::process_interrupt();
 
     using rpm_sampler = devices::rpm_counter<>;
     using namespace systick_state;
-    if (ui::rpm_report)
-    {
+    if (ui::rpm_report) {
       auto psc = rpm_sample_prescale_count;
-      if (++psc == rpm_sampler::Sampling_period)
-      {
-        if (rpm_sampler::process_sample(devices::encoder::get_count()))
-        {
+      if (++psc == rpm_sampler::Sampling_period) {
+        if (rpm_sampler::process_sample(devices::encoder::get_count())) {
           ui::rpm_update = true;
         }
         rpm_sample_prescale_count = 0;
-      }
-      else
-      {
+      } else {
         rpm_sample_prescale_count = psc;
       }
     }
-    if ((timer::milliseconds & 1023) == 0)
-    {
+    if ((timer::milliseconds & 1023) == 0) {
       devices::debug::toggle_led();
     }
   }
 
-  void TIM1_CC_IRQHandler()
-  {
+  void TIM1_CC_IRQHandler() {
     using namespace devices;
     auto enc = encoder::get_count();
     bool dir = step_gen::get_direction();
     const bool fwd = encoder::is_cc_fwd_interrupt();
     encoder::clear_cc_interrupt();
     using namespace gear;
-    if (fwd)
-    {
+    if (fwd) {
       encoder::trigger_clear();
       state.err = range.next.error;
       range.next_jump(dir, enc);
       step_gen::set_delay(phase_delay(encoder_pulse_duration::last_duration(), range.next.error));
       encoder::trigger_restore();
-    }
-    else
-    { // Change direction, setup delayed pulse and do manual trigger
+    } else { // Change direction, setup delayed pulse and do manual trigger
       dir = !dir;
       step_gen::change_direction(dir);
       encoder::trigger_manual_pulse();
@@ -108,28 +93,24 @@ extern "C"
     encoder::update_channels(range.next.count, range.prev.count);
   }
 
-  void TIM2_IRQHandler()
-  {
+  void TIM2_IRQHandler() {
     devices::encoder_pulse_duration::process_interrupt();
   }
 
-  void TIM3_IRQHandler()
-  {
+  void TIM3_IRQHandler() {
     using devices::step_gen;
     step_gen::process_interrupt();
     gear::state.output_position += step_gen::get_direction() ? 1 : -1;
   }
 
-  void USART1_IRQHandler()
-  {
+  void USART1_IRQHandler() {
     devices::hmi<>::process_interrupt();
   }
 } // extern "C"
 
 Configuration config{};
 
-int main()
-{
+int main() {
   using namespace devices;
 
 #ifdef DEBUG
@@ -140,7 +121,7 @@ int main()
 
   step_gen::init();
   step_gen::configure(constants::step_dir_hold_ns, constants::step_pulse_ns,
-                      constants::invert_step_pin, constants::invert_dir_pin);
+    constants::invert_step_pin, constants::invert_dir_pin);
 
   gear::configure(config.calculate_ratio(), 0);
 
@@ -154,20 +135,17 @@ int main()
 
   ui::rpm_report = true;
 
-  auto f_check_thread = [&](int16_t index) -> uint8_t
-  {
+  auto f_check_thread = [&](int16_t index) -> uint8_t {
     return config.verify_thread<encoder::CounterValue>(index);
   };
 
-  while (true)
-  {
-    if (ui::rpm_update && ui::rpm_report)
-    {
+  while (true) {
+    if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
       // todo send rpm
       display::send_rpm(
-          rpm_counter<>::get_rpm(constants::encoder_resolution),
-          step_gen::get_direction());
+        rpm_counter<>::get_rpm(constants::encoder_resolution),
+        step_gen::get_direction());
     }
   }
 
