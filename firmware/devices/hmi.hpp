@@ -7,7 +7,6 @@ namespace devices {
   struct hmi {
 
     static void init() {
-      using namespace Kvasir;
       AFIO->MAPR |= AFIO_MAPR_USART1_REMAP;
 
       // tx

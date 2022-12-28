@@ -1,13 +1,10 @@
 
 #include <algorithm>
 #include <array>
-#include <Chip/STM32F103xx.hpp>
 #include <chrono>
 #include <cstdio>
 #include <limits>
 #include <optional>
-#include <Register/Register.hpp>
-#include <Register/Utility.hpp>
 #include <string_view>
 
 #include "components/gear.hpp"
@@ -19,7 +16,6 @@
 #include "devices/hmi.hpp"
 #include "devices/rpm_counter.hpp"
 #include "devices/step_gen.cpp"
-#include "interrupts.hpp"
 #include "thread_list.hpp"
 #include "threads.hpp"
 
