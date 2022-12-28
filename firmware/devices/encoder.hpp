@@ -3,6 +3,7 @@
 #include <Register/Register.hpp>
 
 #include "../constants.hpp"
+#include "../interrupts.hpp"
 
 namespace devices {
 

@@ -35,8 +35,7 @@ extern "C" void SystemInit() {
   RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
   RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 
-  SysTick->LOAD &= ~SysTick_LOAD_RELOAD_Msk; // disable the systick timer
-  SysTick->LOAD |= 9000 - 1; // set SysTick timer to 1ms
+  SysTick->LOAD = 9000 - 1; // set SysTick timer to 1ms
   SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk; // use external clock (sets div = 8)
   SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; // enable the systick exception request 
   SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk; // enable SysTick 
