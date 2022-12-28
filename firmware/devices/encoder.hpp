@@ -1,87 +1,77 @@
-
-#include <Chip/STM32F103xx.hpp>
-#include <Register/Register.hpp>
-
-#include "../constants.hpp"
-#include "../interrupts.hpp"
+#include "stm32f103xb.h"
 
 namespace devices {
 
     struct encoder {
-        using pin_A = constants::pins::enc_A;
-        using pin_B = constants::pins::enc_B;
-        using pin_Ch3 = constants::pins::tim1_ch3;
-
-        // TODO: configurable polarity selection and input filter
-        static constexpr auto input_filter = 0b0011; // 0b0011 for N = 8 samples
-
         using CounterValue = uint16_t;
 
         static void init() {
-            // Pins
-            using namespace Kvasir;
-            apply(write(pin_A::cr::cnf, gpio::PinConfig::Input_pullup_pulldown),
-                set(pin_A::bsrr),
-                write(pin_B::cr::cnf, gpio::PinConfig::Input_pullup_pulldown),
-                set(pin_B::bsrr));
-            apply(write(pin_Ch3::cr::mode, gpio::PinMode::Output_2Mhz),
-                write(pin_Ch3::cr::cnf, gpio::PinConfig::Output_alternate_push_pull));
-            // Timer
-            apply(write(Tim1Ccmr1Input::cc1s, 0b01),
-                write(Tim1Ccmr1Input::ic1f, input_filter),
-                write(Tim1Ccmr1Input::cc2s, 0b01),
-                write(Tim1Ccmr1Input::ic2f, input_filter),
-                write(Tim1Ccmr2Output::oc3m, 0b001), // Set on match
-                write(Tim1Smcr::sms, 0b011),
-                write(Tim1Cr2::mms, 0b110), // oc3ref is TRGO
-                set(Tim1Ccer::cc3e),        // enable ch3 output
-                set(Tim1Bdtr::moe)          // enable outputs
-            );
-            apply(set(Tim1Cr1::cen));
+            // pins
+            GPIOA->CRH &= ~(GPIO_CRH_CNF8_Msk | GPIO_CRH_MODE8_Msk); // clear the default bits
+            GPIOA->CRH |= GPIO_CRH_CNF8_1; // input pull-down/pull-up
+            GPIOA->BSRR |= GPIO_BSRR_BS8; // pull high
+
+            GPIOA->CRH &= ~(GPIO_CRH_CNF9_Msk | GPIO_CRH_MODE9_Msk); // clear the default bits
+            GPIOA->CRH |= GPIO_CRH_CNF9_1; // input pull-down/pull-up
+            GPIOA->BSRR |= GPIO_BSRR_BS9; // pull high
+
+            GPIOA->CRH &= ~(GPIO_CRH_CNF10_Msk | GPIO_CRH_MODE10_Msk); // general purpose output push-pull
+            GPIOA->CRH |= GPIO_CRH_CNF10_1; // Alternate function output Push-pull
+            GPIOA->CRH |= GPIO_CRH_MODE10_1; // Output mode, max speed 2MHz
+
+            TIM1->CCMR1 |= TIM_CCMR1_CC1S_0; // CC1 channel is configured as input, IC1 is mapped on TI1
+            TIM1->CCMR1 |= TIM_CCMR1_IC1F_0 | TIM_CCMR1_IC1F_1; // filter: n = 8
+            TIM1->CCMR1 |= TIM_CCMR1_CC2S_0; // CC2 channel is configured asinput, IC2 is mapped on TI2
+            TIM1->CCMR1 |= TIM_CCMR1_IC2F_0 | TIM_CCMR1_IC1F_1; // filter: n = 8
+            TIM1->CCMR2 |= TIM_CCMR2_OC3M_0; // Set on match
+            TIM1->SMCR |= TIM_SMCR_SMS_0 | TIM_SMCR_SMS_1; // both input active on both rising and falling edges
+            TIM1->CR2 |= TIM_CR2_MMS_1 | TIM_CR2_MMS_2; // OC3REF signal is used as trigger output (TRGO) 
+            TIM1->CCER |= TIM_CCER_CC3E; // Capture/Compare 3 ouput enable 
+            TIM1->BDTR |= TIM_BDTR_MOE; // OC and OCN outputs are enabled if the respective bits is set in CCER 
+
+            TIM1->CR1 |= TIM_CR1_CEN; // Counter enabled
 
             setup_cc_interrupt();
         }
 
         static void setup_cc_interrupt() {
-            using namespace Kvasir;
-            apply(set(Tim1Dier::cc3ie), set(Tim1Dier::cc4ie));
+            TIM1->DIER |= TIM_DIER_CC3IE; // CC3 interrupt enabled
+            TIM1->DIER |= TIM_DIER_CC4IE; // CC4 interrupt enabled
             clear_cc_interrupt();
-            interrupts::enable<IRQ::tim1_cc_irqn>();
+            NVIC_EnableIRQ(TIM1_CC_IRQn);
         }
 
         static inline bool is_cc_fwd_interrupt() {
-            using namespace Kvasir;
-            return apply(read(Tim1Sr::cc3if));
+            return TIM1->SR & TIM_SR_CC3IF_Msk;
         }
 
         static inline void clear_cc_interrupt() {
-            using namespace Kvasir;
-            apply(clear(Tim1Sr::cc3if),
-                clear(Tim1Sr::cc4if));
+            TIM1->SR &= ~(TIM_SR_CC3IF_Msk | TIM_SR_CC4IF_Msk);
         }
 
         static inline void update_channels(CounterValue next, CounterValue prev) {
-            using namespace Kvasir;
-            apply(write(Tim1Ccr3::ccr3, next),
-                write(Tim1Ccr4::ccr4, prev));
+            TIM1->CCR3 = next;
+            TIM1->CCR4 = prev;
         }
 
         static void inline trigger_clear() {
-            apply(write(Kvasir::Tim1Ccmr2Output::oc3m, 0b100)); // force oc3ref low
+            TIM1->CCMR2 &= ~TIM_CCMR2_OC3M_Msk;
+            TIM1->CCMR2 |= TIM_CCMR2_OC3M_2; // force oc3ref low
         }
 
         static void inline trigger_restore() {
-            apply(write(Kvasir::Tim1Ccmr2Output::oc3m, 0b001)); // set oc3ref on match
+            TIM1->CCMR2 |= TIM_CCMR2_OC3M_0; // Set on match
         }
 
         static void inline trigger_manual_pulse() {
-            apply(write(Kvasir::Tim1Ccmr2Output::oc3m, 0b101)); // Force oc3ref high
+            TIM1->CCMR2 &= ~TIM_CCMR2_OC3M_Msk;
+            TIM1->CCMR2 |= TIM_CCMR2_OC3M_0 | TIM_CCMR2_OC3M_2; // Force oc3ref high
             trigger_clear();
             trigger_restore();
         }
 
         static inline CounterValue get_count() {
-            return apply(read(Kvasir::Tim1Cnt::cnt));
+            return TIM1->CNT;
         }
     };
 

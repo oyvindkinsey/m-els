@@ -4,6 +4,7 @@
 #include <Register/Utility.hpp>
 
 #include "../constants.hpp"
+#include "../interrupts.hpp"
 
 namespace devices {
 
