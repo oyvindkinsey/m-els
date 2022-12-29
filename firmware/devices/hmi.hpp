@@ -2,7 +2,10 @@
 #include "../constants.hpp"
 
 namespace devices {
+  static bool d = false;
+
   template <unsigned ClkFreq = constants::CPU_Clock_Freq_Hz, unsigned BaudRate = 115200>
+
 
   struct hmi {
 
@@ -16,7 +19,7 @@ namespace devices {
 
       // rx
       GPIOB->CRL &= ~(GPIO_CRL_CNF7_Msk | GPIO_CRL_MODE7_Msk); // reset
-      GPIOB->CRL |= GPIO_CRL_CNF6_0; // Floating input 
+      GPIOB->CRL |= GPIO_CRL_CNF7_0; // Floating input 
 
       // usart
       USART1->BRR = ClkFreq / BaudRate; // baud rate register
@@ -25,19 +28,28 @@ namespace devices {
       USART1->CR1 |= USART_CR1_TE; // Transmitter enable
       USART1->CR1 |= USART_CR1_UE; // USART enable
 
+      NVIC_EnableIRQ(USART1_IRQn);
     }
+
+
 
     static inline void process_interrupt() {
       auto c = USART1->DR;
       // todo: handle c
+      if (c == 10 || c == 13) {
+        d = true;
+      }
+      send_char(c);
     }
 
-    static void send_rpm(uint16_t val, bool dir) {
+    static void send_rpm(const std::string_view& desc, uint16_t val, bool dir) {
       send_packet(
         std::sprintf(
           out_buf.begin(),
-          "rpm=%u, fwd=%d\r\n",
+          "thread=%s, rpm=%u, d=%d, fwd=%d\r\n",
+          std::string(desc).c_str(),
           val,
+          d,
           dir));
     }
 

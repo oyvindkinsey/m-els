@@ -10,12 +10,7 @@
 #include <type_traits>
 
 namespace threads {
-  //using ratio_t = boost::rational<uint64_t>;
   using Rational = boost::rational<unsigned>;
-
-  constexpr auto tpi_pitch = [](auto tpi) -> Rational {
-    return { 127, 5 * tpi };
-  };
 
   enum class pitch_type {
     mm,
@@ -26,31 +21,6 @@ namespace threads {
     std::string_view pitch_str;
     Rational value;
     pitch_type type;
-
-    std::string_view unit() const {
-      if (type == pitch_type::mm)
-        return "mm";
-      else
-        return "tpi";
-    }
-  };
-
-  struct thread {
-    std::string_view name;
-    pitch_info pitch;
-    bool is_custom{ false };
-
-    char* description_c_str(char* buf) const {
-      buf = std::copy(name.begin(), name.end(), buf);
-      *buf++ = ' ';
-      buf = std::copy(pitch.pitch_str.begin(), pitch.pitch_str.end(), buf);
-      auto unit = pitch.unit();
-      buf = std::copy(unit.begin(), unit.end(), buf);
-      if (is_custom) {
-        *buf++ = '*';
-      }
-      return buf;
-    }
   };
 
   namespace detail {

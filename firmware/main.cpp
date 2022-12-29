@@ -8,22 +8,68 @@
 #include <string_view>
 
 #include "components/gear.hpp"
-#include "components/timer.hpp"
-#include "configuration.hpp"
-#include "devices/debug.hpp"
 #include "devices/encoder.hpp"
 #include "devices/hmi.hpp"
-#include "devices/rpm_counter.hpp"
 #include "devices/step_gen.hpp"
-#include "thread_list.hpp"
 #include "threads.hpp"
-
-#ifdef DEBUG
-#include "devices/serial.hpp"
-#endif
 
 namespace systick_state {
   volatile uint8_t rpm_sample_prescale_count = 0;
+  inline volatile unsigned int milliseconds = 0;
+}
+
+namespace devices {
+  struct debug {
+    static void init() {
+      GPIOC->CRH &= ~GPIO_CRH_CNF13_Msk | GPIO_CRH_MODE13_Msk; // general purpose output push-pull
+      GPIOC->CRH |= GPIO_CRH_MODE13_1; // Output mode, max speed 2MHz
+    }
+
+    static void toggle_led() {
+      GPIOC->ODR ^= GPIO_ODR_ODR13_Msk;
+    }
+  };
+
+  template <uint8_t Period_ms = 10, uint8_t Samples = 16>
+
+  struct rpm_counter {
+    static constexpr uint16_t periods_per_min = 60000 / Period_ms;
+    static constexpr uint8_t Sampling_period = Period_ms;
+
+    volatile inline static uint16_t last_reading = 0;
+    volatile inline static uint8_t sample_index = 0;
+    volatile inline static unsigned running_sum = 0;
+    volatile inline static uint16_t sum = 0;
+
+    static inline uint16_t convert_sample(uint16_t c) {
+      auto p = last_reading;
+      uint16_t d = (c > p) ? (c - p) : (p - c);
+      if (d > std::numeric_limits<uint16_t>::max() / 2) {
+        d = std::numeric_limits<uint16_t>::max() - d;
+      }
+      last_reading = c;
+      return d;
+    }
+
+    static bool process_sample(uint16_t current_reading) {
+      running_sum += convert_sample(current_reading);
+      auto i = sample_index;
+      if ((++i) == Samples) {
+        sum = running_sum;
+        sample_index = 0;
+        running_sum = 0;
+        return true;
+      } else {
+        sample_index = i;
+        return false;
+      }
+    }
+
+    static uint16_t get_rpm(uint16_t encoder_resolution) {
+      auto rpm = (sum * periods_per_min) / (encoder_resolution * Samples);
+      return static_cast<uint16_t>(rpm);
+    }
+  };
 }
 
 namespace ui {
@@ -45,10 +91,10 @@ namespace control {
 extern "C"
 { // interrupt handlers
   void SysTick_Handler() { // Called every 1 ms
-    timer::process_interrupt();
+    using namespace systick_state;
+    ++milliseconds;
 
     using rpm_sampler = devices::rpm_counter<>;
-    using namespace systick_state;
     if (ui::rpm_report) {
       auto psc = rpm_sample_prescale_count;
       if (++psc == rpm_sampler::Sampling_period) {
@@ -60,7 +106,7 @@ extern "C"
         rpm_sample_prescale_count = psc;
       }
     }
-    if ((timer::milliseconds & 1023) == 0) {
+    if ((milliseconds & 1023) == 0) {
       devices::debug::toggle_led();
     }
   }
@@ -103,42 +149,43 @@ extern "C"
   }
 } // extern "C"
 
-Configuration config{};
-
 int main() {
   using namespace devices;
-
-#ifdef DEBUG
-  Serial2<>::init(); // Used as console
-#endif
+  using namespace threads::literals;
 
   devices::debug::init();
 
   step_gen::init();
-  step_gen::configure(constants::step_dir_hold_ns, constants::step_pulse_ns,
-    constants::invert_step_pin, constants::invert_dir_pin);
+  step_gen::configure(
+    constants::step_dir_hold_ns,
+    constants::step_pulse_ns,
+    constants::invert_step_pin,
+    constants::invert_dir_pin);
 
-  gear::configure(config.calculate_ratio(), 0);
+  gear::configure(2.00_mm, 0);
 
   encoder::init();
-  encoder::update_channels(gear::range.next.count, gear::range.prev.count);
+  encoder::update_channels(
+    gear::range.next.count,
+    gear::range.prev.count);
 
   using display = hmi<>;
   display::init();
 
   ui::rpm_report = true;
 
-  auto f_check_thread = [&](int16_t index) -> uint8_t {
-    return config.verify_thread<encoder::CounterValue>(index);
-  };
-
   while (true) {
     if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
       // todo send rpm
       display::send_rpm(
+        gear::get_pitch_info().pitch_str,
         rpm_counter<>::get_rpm(constants::encoder_resolution),
         step_gen::get_direction());
+    }
+    if (devices::d) {
+      devices::d = false;
+      gear::configure(1.00_mm, devices::encoder::get_count());
     }
   }
 
