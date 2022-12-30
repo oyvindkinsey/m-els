@@ -183,9 +183,22 @@ int main() {
         rpm_counter<>::get_rpm(constants::encoder_resolution),
         step_gen::get_direction());
     }
-    if (devices::d) {
-      devices::d = false;
-      gear::configure(1.00_mm, devices::encoder::get_count());
+
+    auto command = hmi<>::process();
+    if (command != NULL) {
+      switch (command[0]) {
+      case 0x31:
+        gear::configure(1.00_mm, encoder::get_count());
+        break;
+      case 0x32:
+        gear::configure(1.50_mm, encoder::get_count());
+        break;
+      case 0x33:
+        gear::configure(2.00_mm, encoder::get_count());
+        break;
+      default:
+        break;
+      }
     }
   }
 
