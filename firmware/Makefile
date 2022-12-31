@@ -27,6 +27,9 @@ $(NAME).axf: $(STARTUP) $(CFILES) $(CPPFILES) $(HPPFILES)
 
 bin: $(NAME).axf
 	$(OBJCP) -O binary $(NAME).axf $(NAME).bin
-	
-clean: 
+
+flash:
+	st-flash --reset write Didge.bin 0x8000000
+
+clean:
 	rm -f $(NAME).axf *.map

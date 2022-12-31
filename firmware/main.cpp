@@ -147,14 +147,14 @@ extern "C"
   void USART1_IRQHandler() {
     if (USART1->SR & USART_SR_IDLE) {
       (void)USART1->DR; // clear idle flag
-      devices::hmi<>::process_idle_interrupt();
+      devices::hmi::process_idle_interrupt();
     }
   }
 
   void DMA1_Channel5_IRQHandler() {
     if (DMA1->ISR & DMA_ISR_TCIF5) {
       DMA1->IFCR = DMA_IFCR_CTCIF5;
-      devices::hmi<>::process_interrupt();
+      devices::hmi::process_tc_interrupt();
     }
   }
 } // extern "C"
@@ -179,22 +179,20 @@ int main() {
     gear::range.next.count,
     gear::range.prev.count);
 
-  using display = hmi<>;
-  display::init();
+  hmi::init();
 
   ui::rpm_report = true;
 
   while (true) {
     if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
-      // todo send rpm
-      display::send_rpm(
+      hmi::send_info(
         gear::get_pitch_info().pitch_str,
         rpm_counter<>::get_rpm(constants::encoder_resolution),
         step_gen::get_direction());
     }
 
-    auto command = hmi<>::process();
+    auto command = hmi::process();
     if (command != NULL) {
       switch (command[0]) {
       case 0x31:
