@@ -144,6 +144,13 @@ extern "C"
     gear::state.output_position += step_gen::get_direction() ? 1 : -1;
   }
 
+  void USART1_IRQHandler() {
+    if (USART1->SR & USART_SR_IDLE) {
+      (void)USART1->DR; // clear idle flag
+      devices::hmi<>::process_idle_interrupt();
+    }
+  }
+
   void DMA1_Channel5_IRQHandler() {
     if (DMA1->ISR & DMA_ISR_TCIF5) {
       DMA1->IFCR = DMA_IFCR_CTCIF5;

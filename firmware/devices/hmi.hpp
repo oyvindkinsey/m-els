@@ -38,9 +38,6 @@ namespace container {
 }
 
 namespace devices {
-  inline static volatile unsigned command_length = 0;
-  volatile static inline char dma_buff_in[1];
-  volatile static inline char dma_buff_out[256];
 
   template <unsigned ClkFreq = constants::CPU_Clock_Freq_Hz, unsigned BaudRate = 115200>
 
@@ -67,6 +64,7 @@ namespace devices {
       USART1->BRR = ClkFreq / BaudRate; // baud rate register
       USART1->CR1 |= USART_CR1_RE; // Receiver enable
       USART1->CR1 |= USART_CR1_TE; // Transmitter enable
+      USART1->CR1 |= USART_CR1_IDLEIE; // idle interrupt enabled
       USART1->CR3 = USART_CR3_DMAR; // DMA enable receiver 
       USART1->CR3 |= USART_CR3_DMAT; // DMA enable transmitter 
 
@@ -77,7 +75,7 @@ namespace devices {
       DMA1_Channel5->CCR |= DMA_CCR_MINC; // memory increment mode
       DMA1_Channel5->CCR |= DMA_CCR_CIRC; // circular mode 
       DMA1_Channel5->CCR |= DMA_CCR_TCIE; // transfer complete interrupt enable
-      DMA1_Channel5->CNDTR = 1; // length of data to expect
+      DMA1_Channel5->CNDTR = 4; // length of data to expect
       DMA1_Channel5->CCR |= DMA_CCR_EN;
       NVIC_SetPriority(DMA1_Channel5_IRQn, 0);
       NVIC_EnableIRQ(DMA1_Channel5_IRQn);
@@ -96,19 +94,21 @@ namespace devices {
       NVIC_EnableIRQ(USART1_IRQn);
     }
 
+    static inline void process_idle_interrupt() {
+      // reset DMA 
+      DMA1_Channel5->CCR &= ~DMA_CCR_EN;
+      DMA1_Channel5->CMAR = reinterpret_cast<unsigned>(std::addressof(dma_buff_in)); // dest
+      DMA1_Channel5->CNDTR = 4; // length of data to expect
+      DMA1_Channel5->CCR |= DMA_CCR_EN;
+      process_interrupt();
+    }
+
     static inline void process_interrupt() {
-      char c = dma_buff_in[0];
-      if (c == 13) {// carriage return
-        char* command = new char[command_length];
-        for (auto i = 0; i < command_length; i++) {
-          command[i] = read_buf.pop();
-        }
-        command_buf.push(command);
-        command_length = 0;
-      } else {
-        read_buf.push(c);
-        ++command_length;
+      char* command = new char[4];
+      for (auto i = 0; i < 4; i++) {
+        command[i] = dma_buff_in[i];
       }
+      command_buf.push(command);
     }
 
     static inline char* process() {
@@ -130,8 +130,8 @@ namespace devices {
     }
 
   private:
+    volatile static inline char dma_buff_in[4];
     inline static std::array<char, 256> out_buf{};
-    inline static container::fixed_size_circular_buffer<char, 256, uint16_t> read_buf{};
     inline static container::fixed_size_circular_buffer<char*, 8, uint16_t> command_buf{};
 
     static inline void uart_dma_transmit(
