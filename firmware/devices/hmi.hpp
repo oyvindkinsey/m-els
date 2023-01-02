@@ -5,6 +5,7 @@
 namespace devices {
 
   constexpr uint64_t BaudRate = 115200;
+  inline volatile unsigned int cnt = 0;
 
   struct hmi {
 
@@ -13,6 +14,7 @@ namespace devices {
     volatile static inline char dma_buff_in[4];
     inline static char dma_buff_out[256];
     inline static container::fixed_size_circular_buffer<char*, 8, uint16_t> command_buf{};
+
 
     static inline void uart_dma_transmit(
       uint16_t length) {
@@ -107,10 +109,23 @@ namespace devices {
     static void send_info(const std::string_view& desc, uint16_t val, bool dir) {
       uart_dma_transmit(std::sprintf(
         dma_buff_out,
-        "thread=%s, rpm=%u, fwd=%d\r\n",
+        "thread=%s, rpm=%u, fwd=%d, cnt=%d\r\n",
         std::string(desc).c_str(),
         val,
-        dir));
+        dir,
+        cnt));
+    }
+
+    static void send(char* msg) {
+      uart_dma_transmit(std::sprintf(
+        dma_buff_out,
+        "msg=%s\r\n",
+        msg));
+    }
+
+    static void signal() {
+      ++cnt;
+
     }
 
   };

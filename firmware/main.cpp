@@ -10,6 +10,7 @@
 #include "components/gear.hpp"
 #include "devices/encoder.hpp"
 #include "devices/hmi.hpp"
+#include "devices/i2c.hpp"
 #include "devices/step_gen.hpp"
 #include "threads.hpp"
 
@@ -180,6 +181,7 @@ int main() {
     gear::range.prev.count);
 
   hmi::init();
+  i2c::init();
 
   ui::rpm_report = true;
 
