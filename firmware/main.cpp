@@ -158,6 +158,15 @@ extern "C"
       devices::hmi::process_tc_interrupt();
     }
   }
+
+  void I2C1_EV_IRQHandler() {
+    devices::i2c::I2C1_EV_IRQHandler();
+
+  }
+
+  void DMA1_Channel7_IRQHandler() {
+    devices::i2c::DMA1_Channel7_IRQHandler();
+  }
 } // extern "C"
 
 int main() {
