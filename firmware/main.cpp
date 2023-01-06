@@ -197,10 +197,12 @@ int main() {
   while (true) {
     if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
+      auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
       hmi::send_info(
         gear::get_pitch_info().pitch_str,
-        rpm_counter<>::get_rpm(constants::encoder_resolution),
+        rpm,
         step_gen::get_direction());
+      i2c::set_rpm(rpm);
     }
 
     auto command = hmi::process();

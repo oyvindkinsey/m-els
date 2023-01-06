@@ -6,10 +6,9 @@ namespace devices {
 
     struct i2c {
 
-        uint8_t reg_addr = 0;
-        uint16_t rpm_reg = 234;
         volatile static inline char dma_buff_in[4];
         volatile static inline bool send_stop;
+        volatile static inline char registers[16];
 
     public:
         static void init() {
@@ -50,6 +49,13 @@ namespace devices {
             NVIC_EnableIRQ(I2C1_EV_IRQn);
         }
 
+        static void set_rpm(uint16_t rpm) {
+            // store in register 0 and 1
+
+            registers[0] = rpm >> 8;
+            registers[1] = 0x0F & rpm;
+
+        }
 
         static void DMA1_Channel7_IRQHandler() {
             if (DMA1->ISR & DMA_ISR_TCIF7) {
@@ -63,7 +69,14 @@ namespace devices {
             if (I2C1->SR1 & I2C_SR1_ADDR) { // address matched
                 if (I2C1->SR2 & I2C_SR2_TRA) {
                     // transmitter
-                    I2C1->DR = dma_buff_in[0];
+                    switch (dma_buff_in[0]) {
+                    case 0x1:
+                        I2C1->DR = registers[0];
+                        break;
+                    case 0x2:
+                        I2C1->DR = registers[1];
+                        break;
+                    }
                     send_stop = true;
                 } else {
                     // receiver
