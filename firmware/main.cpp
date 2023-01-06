@@ -146,27 +146,22 @@ extern "C"
   }
 
   void USART1_IRQHandler() {
-    if (USART1->SR & USART_SR_IDLE) {
-      (void)USART1->DR; // clear idle flag
-      devices::hmi::process_idle_interrupt();
-    }
+    devices::hmi::USART1_IRQHandler();
   }
 
   void DMA1_Channel5_IRQHandler() {
-    if (DMA1->ISR & DMA_ISR_TCIF5) {
-      DMA1->IFCR = DMA_IFCR_CTCIF5;
-      devices::hmi::process_tc_interrupt();
-    }
+    devices::i2c::DMA1_Channel5_IRQHandler();
+    // if (DMA1->ISR & DMA_ISR_TCIF5) {
+    //   DMA1->IFCR = DMA_IFCR_CTCIF5;
+    //   devices::hmi::process_tc_interrupt();
+    // }
   }
 
-  void I2C1_EV_IRQHandler() {
-    devices::i2c::I2C1_EV_IRQHandler();
+  void I2C2_EV_IRQHandler() {
+    devices::i2c::I2C2_EV_IRQHandler();
 
   }
 
-  void DMA1_Channel7_IRQHandler() {
-    devices::i2c::DMA1_Channel7_IRQHandler();
-  }
 } // extern "C"
 
 int main() {
@@ -189,7 +184,7 @@ int main() {
     gear::range.next.count,
     gear::range.prev.count);
 
-  hmi::init();
+  // hmi::init();
   i2c::init();
 
   ui::rpm_report = true;
@@ -198,29 +193,29 @@ int main() {
     if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
       auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
-      hmi::send_info(
-        gear::get_pitch_info().pitch_str,
-        rpm,
-        step_gen::get_direction());
+      // hmi::send_info(
+      //   gear::get_pitch_info().pitch_str,
+      //   rpm,
+      //   step_gen::get_direction());
       i2c::set_rpm(rpm);
     }
 
-    auto command = hmi::process();
-    if (command != NULL) {
-      switch (command[0]) {
-      case 0x31:
-        gear::configure(1.00_mm, encoder::get_count());
-        break;
-      case 0x32:
-        gear::configure(1.50_mm, encoder::get_count());
-        break;
-      case 0x33:
-        gear::configure(2.00_mm, encoder::get_count());
-        break;
-      default:
-        break;
-      }
-    }
+    // auto command = hmi::process();
+    // if (command != NULL) {
+    //   switch (command[0]) {
+    //   case 0x31:
+    //     gear::configure(1.00_mm, encoder::get_count());
+    //     break;
+    //   case 0x32:
+    //     gear::configure(1.50_mm, encoder::get_count());
+    //     break;
+    //   case 0x33:
+    //     gear::configure(2.00_mm, encoder::get_count());
+    //     break;
+    //   default:
+    //     break;
+    //   }
+    // }
   }
 
   return 0;

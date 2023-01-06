@@ -38,6 +38,9 @@ namespace devices {
   public:
 
     static void init() {
+
+      RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+
       // Connect USART1 to alternate pins 6 and 7
       AFIO->MAPR |= AFIO_MAPR_USART1_REMAP;
 
@@ -85,16 +88,6 @@ namespace devices {
       USART1->CR1 |= USART_CR1_UE; // USART enable
     }
 
-    static inline void process_idle_interrupt() {
-      // reset DMA
-      DMA1_Channel5->CCR &= ~DMA_CCR_EN;
-      DMA1_Channel5->CMAR = reinterpret_cast<unsigned>(std::addressof(dma_buff_in)); // dest
-      DMA1_Channel5->CNDTR = 4; // length of data to expect
-      DMA1_Channel5->CCR |= DMA_CCR_EN;
-
-      process_rx();
-    }
-
     static inline void process_tc_interrupt() {
       process_rx();
     }
@@ -128,5 +121,16 @@ namespace devices {
 
     }
 
+    static void  USART1_IRQHandler() {
+      if (USART1->SR & USART_SR_IDLE) {
+        (void)USART1->DR; // clear idle flag
+        // reset DMA
+        DMA1_Channel5->CCR &= ~DMA_CCR_EN;
+        DMA1_Channel5->CMAR = reinterpret_cast<unsigned>(std::addressof(dma_buff_in)); // dest
+        DMA1_Channel5->CNDTR = 4; // length of data to expect
+        DMA1_Channel5->CCR |= DMA_CCR_EN;
+        process_rx();
+      }
+    }
   };
 }
