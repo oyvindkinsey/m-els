@@ -14,6 +14,9 @@
 #include "devices/step_gen.hpp"
 #include "threads.hpp"
 
+#define FLAGS_STEPPER_EN 0x80
+#define FLAGS_RPM_EN 0x40
+
 namespace systick_state {
   volatile uint8_t rpm_sample_prescale_count = 0;
   inline volatile unsigned int milliseconds = 0;
@@ -166,7 +169,7 @@ int main() {
 
   devices::debug::init();
 
-  step_gen::init();
+  // step_gen::init();
   step_gen::configure(
     constants::step_dir_hold_ns,
     constants::step_pulse_ns,
@@ -185,20 +188,31 @@ int main() {
 
   ui::rpm_report = true;
 
+  char flags = 0x40;;
   uint8_t num = 1;
   uint8_t denom = 1;
+
+  i2c::reg.flags = flags;
   i2c::reg.gear_num = num;
   i2c::reg.gear_denom = denom;
 
   while (true) {
-    if (ui::rpm_update && ui::rpm_report) {
+    if (ui::rpm_update) {
       ui::rpm_update = false;
       auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
-      // hmi::send_info(
-      //   gear::get_pitch_info().pitch_str,
-      //   rpm,
-      //   step_gen::get_direction());
-      i2c::set_rpm(rpm);
+      i2c::reg.rpm_l = (uint8_t)(0x00FF & rpm);
+      i2c::reg.rpm_h = (uint8_t)(rpm >> 8);
+    }
+
+    if (i2c::reg.flags != flags) {
+      // todo, xor on individual bits
+      flags = i2c::reg.flags;
+      ui::rpm_report = flags & FLAGS_RPM_EN;
+
+      if (flags & FLAGS_STEPPER_EN) {
+        step_gen::init();
+      }
+
     }
 
     if (i2c::reg.gear_num != num || i2c::reg.gear_denom != denom) {
@@ -208,23 +222,6 @@ int main() {
       threads::pitch_info pi = { "blah", ra, threads::pitch_type::mm };
       gear::configure(pi, encoder::get_count());
     }
-
-    // auto command = hmi::process();
-    // if (command != NULL) {
-    //   switch (command[0]) {
-    //   case 0x31:
-    //     gear::configure(1.00_mm, encoder::get_count());
-    //     break;
-    //   case 0x32:
-    //     gear::configure(1.50_mm, encoder::get_count());
-    //     break;
-    //   case 0x33:
-    //     gear::configure(2.00_mm, encoder::get_count());
-    //     break;
-    //   default:
-    //     break;
-    //   }
-    // }
   }
 
   return 0;
