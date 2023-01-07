@@ -5,10 +5,10 @@
 namespace devices {
 
     typedef struct {
-        char rpm1;
-        char rpm2;
-        char r3;
-        char r4;
+        char rpm_l;
+        char rpm_h;
+        char gear_num;
+        char gear_denom;
         char r5;
         char r6;
         char r8;
@@ -17,9 +17,9 @@ namespace devices {
     struct i2c {
 
         volatile static inline char dma_buffer[16];
-        volatile static inline register_t reg;
 
     public:
+        volatile static inline register_t reg;
         static void init() {
             RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
 
@@ -64,8 +64,8 @@ namespace devices {
         }
 
         static void set_rpm(uint16_t rpm) {
-            reg.rpm1 = (uint8_t)(0x00FF & rpm);
-            reg.rpm2 = (uint8_t)(rpm >> 8);
+            reg.rpm_l = (uint8_t)(0x00FF & rpm);
+            reg.rpm_h = (uint8_t)(rpm >> 8);
         }
 
         // RX

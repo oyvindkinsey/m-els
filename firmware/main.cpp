@@ -185,6 +185,11 @@ int main() {
 
   ui::rpm_report = true;
 
+  uint8_t num = 1;
+  uint8_t denom = 1;
+  i2c::reg.gear_num = num;
+  i2c::reg.gear_denom = denom;
+
   while (true) {
     if (ui::rpm_update && ui::rpm_report) {
       ui::rpm_update = false;
@@ -194,6 +199,14 @@ int main() {
       //   rpm,
       //   step_gen::get_direction());
       i2c::set_rpm(rpm);
+    }
+
+    if (i2c::reg.gear_num != num || i2c::reg.gear_denom != denom) {
+      num = i2c::reg.gear_num;
+      denom = i2c::reg.gear_denom;
+      threads::Rational ra = { num, denom };
+      threads::pitch_info pi = { "blah", ra, threads::pitch_type::mm };
+      gear::configure(pi, encoder::get_count());
     }
 
     // auto command = hmi::process();
