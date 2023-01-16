@@ -24,7 +24,6 @@ extern "C" void SystemInit() {
 
   // enable peripherals
   RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-  RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
   RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
   RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
   RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
@@ -34,7 +33,6 @@ extern "C" void SystemInit() {
   RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
   RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
   RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
-  RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
 
   SysTick->LOAD = 9000 - 1; // set SysTick timer to 1ms
   SysTick->CTRL &= ~SysTick_CTRL_CLKSOURCE_Msk; // use external clock (sets div = 8)

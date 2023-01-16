@@ -7,8 +7,8 @@ namespace devices {
 
         static constexpr uint64_t ClockFreq = constants::CPU_Clock_Freq_Hz;
         static constexpr uint8_t ClockDiv = 2;
-
         static constexpr unsigned int min_count = constants::min_timer_capture_count; // required by timer
+        static inline bool enabled = false;
 
         struct start_stop {
             volatile uint16_t cnt_start{}, cnt_stop{};
@@ -88,7 +88,6 @@ namespace devices {
             } else {
                 GPIOB->ODR &= ~GPIO_ODR_ODR1;
             }
-
 
             TIM3->CCMR2 &= ~TIM_CCMR2_OC3FE_Msk; // output compare 3 fast disable
             TIM3->CCR3 = state.counts_reverse.cnt_start; // load new capture/compare value

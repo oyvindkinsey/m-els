@@ -25,7 +25,7 @@ namespace systick_state {
 namespace devices {
   struct debug {
     static void init() {
-      GPIOC->CRH &= ~GPIO_CRH_CNF13_Msk | GPIO_CRH_MODE13_Msk; // general purpose output push-pull
+      GPIOC->CRH &= ~(GPIO_CRH_CNF13_Msk | GPIO_CRH_MODE13_Msk); // general purpose output push-pull
       GPIOC->CRH |= GPIO_CRH_MODE13_1; // Output mode, max speed 2MHz
     }
 
@@ -79,6 +79,7 @@ namespace devices {
 namespace ui {
   volatile bool rpm_update = false;
   volatile bool rpm_report = false;
+  volatile bool stepper_enabled = false;
 }
 
 namespace control {
@@ -121,6 +122,9 @@ extern "C"
     bool dir = step_gen::get_direction();
     const bool fwd = encoder::is_cc_fwd_interrupt();
     encoder::clear_cc_interrupt();
+    if (!ui::stepper_enabled) {
+      return;
+    }
     using namespace gear;
     if (fwd) {
       encoder::trigger_clear();
@@ -169,7 +173,7 @@ int main() {
 
   devices::debug::init();
 
-  // step_gen::init();
+  step_gen::init();
   step_gen::configure(
     constants::step_dir_hold_ns,
     constants::step_pulse_ns,
@@ -186,9 +190,9 @@ int main() {
   // hmi::init();
   i2c::init();
 
-  ui::rpm_report = true;
+  // ui::rpm_report = false;
 
-  char flags = 0x40;;
+  char flags = 0x0;
   uint8_t num = 1;
   uint8_t denom = 1;
 
@@ -208,11 +212,7 @@ int main() {
       // todo, xor on individual bits
       flags = i2c::reg.flags;
       ui::rpm_report = flags & FLAGS_RPM_EN;
-
-      if (flags & FLAGS_STEPPER_EN) {
-        step_gen::init();
-      }
-
+      ui::stepper_enabled = flags & FLAGS_STEPPER_EN;
     }
 
     if (i2c::reg.gear_num != num || i2c::reg.gear_denom != denom) {

@@ -11,12 +11,55 @@ namespace devices {
         char gear_num;
         char gear_denom;
     } register_t;
+
     struct i2c {
 
+    private:
         volatile static inline char dma_buffer[16];
+
+        static void rx_complete() {
+            DMA1->IFCR |= DMA_IFCR_CTCIF5;
+            DMA1->IFCR |= DMA_IFCR_CTCIF4;
+            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
+            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
+
+            auto len = 16 - DMA1_Channel5->CNDTR;
+            if (len > 1) {
+                uint32_t base = (uint32_t)&reg;
+                uint8_t offset = dma_buffer[0];
+                uint32_t dest = base + offset;
+                auto incr = sizeof(char);
+                for (auto i = 0; i < len; i++) {
+                    *((uint32_t*)(uintptr_t)dest) = dma_buffer[i + 1];
+                    dest += incr;
+                }
+            }
+            dma_buffer[0] = 0x0;
+        }
+
+        static void rx_start() {
+            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
+            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
+
+            DMA1_Channel5->CNDTR = 16; // length of data to expect
+            DMA1_Channel5->CMAR = (uint32_t)&dma_buffer; // dest
+            DMA1_Channel5->CCR |= DMA_CCR_EN;
+        }
+
+        static void tx_start() {
+            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
+            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
+
+            uint32_t base = (uint32_t)&reg;
+            uint8_t offset = dma_buffer[0];
+            DMA1_Channel4->CMAR = base + offset;
+            DMA1_Channel4->CNDTR = 16;
+            DMA1_Channel4->CCR |= DMA_CCR_EN;
+        }
 
     public:
         volatile static inline register_t reg;
+
         static void init() {
 
             RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
@@ -66,46 +109,6 @@ namespace devices {
             if (DMA1->ISR & DMA_ISR_TCIF5) {
                 rx_complete();
             }
-        }
-
-        static void rx_complete() {
-            DMA1->IFCR |= DMA_IFCR_CTCIF5;
-            DMA1->IFCR |= DMA_IFCR_CTCIF4;
-            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
-            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
-
-            auto len = 16 - DMA1_Channel5->CNDTR;
-            if (len > 1) {
-                uint32_t base = (uint32_t)&reg;
-                uint8_t offset = dma_buffer[0];
-                uint32_t dest = base + offset;
-                auto incr = sizeof(char);
-                for (auto i = 0; i < len; i++) {
-                    *((uint32_t*)(uintptr_t)dest) = dma_buffer[i + 1];
-                    dest += incr;
-                }
-            }
-            dma_buffer[0] = 0x0;
-        }
-
-        static void rx_start() {
-            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
-            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
-
-            DMA1_Channel5->CNDTR = 16; // length of data to expect
-            DMA1_Channel5->CMAR = (uint32_t)&dma_buffer; // dest
-            DMA1_Channel5->CCR |= DMA_CCR_EN;
-        }
-
-        static void tx_start() {
-            DMA1_Channel5->CCR &= ~DMA_CCR_EN;
-            DMA1_Channel4->CCR &= ~DMA_CCR_EN;
-
-            uint32_t base = (uint32_t)&reg;
-            uint8_t offset = dma_buffer[0];
-            DMA1_Channel4->CMAR = base + offset;
-            DMA1_Channel4->CNDTR = 16;
-            DMA1_Channel4->CCR |= DMA_CCR_EN;
         }
 
         static void I2C2_EV_IRQHandler() {
