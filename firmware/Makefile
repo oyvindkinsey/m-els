@@ -1,6 +1,6 @@
 include makefile.conf
 
-NAME=Didge
+NAME=m-els
 
 STARTUP_DEFS=
 
@@ -29,7 +29,7 @@ bin: $(NAME).axf
 	$(OBJCP) -O binary $(NAME).axf $(NAME).bin
 
 flash:
-	st-flash --reset write Didge.bin 0x8000000
+	st-flash --reset write $(NAME).bin 0x8000000
 
 clean:
 	rm -f $(NAME).axf *.map
