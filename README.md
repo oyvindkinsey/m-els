@@ -47,6 +47,8 @@ In addition to I2C, certain operations can be triggered via external interrupt l
 ### User Interface
 A user interface can be selected to match the desired integration, as long as it is able to interface with the driver via I2C and dedicated interrupt lines. This allows for interfaces based entirely on tactile buttons and 8-segment displays, based entirely on a touch screen, or on a combination of these.
 
+The user interface is also where concepts such as thread pitches etc exist, and where imperial vs metric will be visible. For the driver itself, it's all about the gearing ratio.
+
 Separate github projects will be created to track respective implementations.
 
 ## Hardware
