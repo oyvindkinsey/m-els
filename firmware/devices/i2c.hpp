@@ -89,7 +89,7 @@ namespace devices {
             I2C2->CR1 |= I2C_CR1_SWRST; // reset
             I2C2->CR1 &= ~I2C_CR1_SWRST;
             I2C2->CR2 |= 0x24;  //36mhz freq[5:0]
-            I2C2->OAR1 |= 0x1 << 1; // set address to 0x55
+            I2C2->OAR1 |= 0x1 << 1; // set address to 0x1
             I2C2->CR2 |= I2C_CR2_ITEVTEN;
             I2C2->CR2 |= I2C_CR2_DMAEN;
             I2C2->CR1 |= I2C_CR1_PE; // enable
