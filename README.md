@@ -100,8 +100,10 @@ In addition to I2C, certain operations can be triggered via external interrupt l
 
 ### Planned Features
 * Set left and right limit
+* Set feed speed (for movement not synchronized to the spindle)
+* Set rapid speed (for movement not synchronized to the spindle)
 * Jog left and right
-* Move to left and right limit
+* Move to left and right limit (synced to spindle)
 
 ### User Interface
 A user interface can be selected to match the desired integration, as long as it is able to interface with the driver via I2C and dedicated interrupt lines. This allows for interfaces based entirely on tactile buttons and 8-segment displays, based entirely on a touch screen, or on a combination of these.
