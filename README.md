@@ -29,6 +29,7 @@ The following struct is exposed for read/write:
 * gear_denom (rw): The denomenator for the gearing, representing the 'teeth on the driven gear' in the virtual gearing.
 
 ##### Example
+See https://github.com/oyvindkinsey/m-els/blob/master/example/arduino_controller_example/arduino_controller_example.ino for an always up-to-date version.
 ```cpp
 #include <Wire.h>
 
