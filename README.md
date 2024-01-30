@@ -5,7 +5,7 @@ Its main design is a driver based on STM32, which implements the core translatio
 ## Components
 ### Driver
 This component is optimized for performance, and uses low level port manipulation, interrupts, and DMA for all data transfer.
-Since this is free of having to handle input and displays, its resources can be used entirely on implementing core functionality.
+Since this is free of having to handle input and displays, its resources can be used entirely on implementing core functionality without sacrificing support for high resolutions or high RPM.
 
 #### Interface
 The driver acts as an I2C slave, and has its 'gearing' set by writing to exposed registers. The driver also expose interrupt lines, where the interrupt type and related information can be read from respective registers, and subsequently cleared.
