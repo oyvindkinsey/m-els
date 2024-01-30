@@ -4,7 +4,7 @@ Its main design is a driver based on STM32, which implements the core translatio
 
 ## Components
 ### Driver
-This component is optimized for performance, and uses low level port manipulation, interrupts, and DMA for all data transfer. 
+This component is optimized for performance, and uses low level port manipulation, interrupts, and DMA for all data transfer.
 Since this is free of having to handle input and displays, its resources can be used entirely on implementing core functionality.
 
 #### Interface
@@ -32,42 +32,72 @@ The following struct is exposed for read/write:
 ```cpp
 #include <Wire.h>
 
-byte ADDRESS = 1;
+byte ADDRESS = 0x1;
+byte VERSION_OFFSET = 0x0;
+byte FLAGS_MASK_OFFSET = 0x3;
+byte FLAGS_OFFSET = 0x4;
+byte GEARS_OFFSET = 0x5;
+byte RPM_OFFSET = 0x1;
+byte VERSION = 1;
+bool initialized = false;
 
 void setup() {
   Serial.begin(115200);
   Wire.setClock(400000);
   Wire.begin();
 
+  // Start by reading the version
+  Serial.println("Reading version:");
   Wire.beginTransmission(ADDRESS);
-  Wire.write(0x2); //move to register 0x2
-  Wire.write(0x80 | 0x40);  // enable stepper and rpm
-  Wire.write(1); // set the driving gear to 1
-  Wire.write(10); // set the driven gear to 10
+  Wire.write(VERSION_OFFSET);
+  Wire.endTransmission(false);
+
+  Wire.requestFrom(ADDRESS, 1, true);  // request 1 byte
+  byte version = Wire.read();          // read the flags
+  Serial.println(version, DEC);
+  Wire.endTransmission();
+
+  // Initialize driver
+  Wire.beginTransmission(ADDRESS);
+  Wire.write(FLAGS_MASK_OFFSET);  //move to register 0x2
+  Wire.write(0b11000000);         // set the flags mask for the bits we intend to write
+  Wire.write(0x80 | 0x40 | 0x1);  // enable stepper and rpm (and set one ignored bit)
+  Wire.write(1);                  // set the driving gear to 1
+  Wire.write(10);                 // set the driven gear to 10
   int error = Wire.endTransmission();
   if (error != 0) {
     Serial.println("Failed to initialize");
+  } else {
+    if (version == VERSION) {
+      initialized = true;
+    } else {
+      Serial.println("Expected version:");
+      Serial.println(VERSION);
+    }
   }
 }
 
 void loop() {
+  if (!initialized) {
+    return;
+  }
   Serial.println("Reading flags:");
   Wire.beginTransmission(ADDRESS);
-  Wire.write(0x2); // move to register 0x2 
+  Wire.write(FLAGS_OFFSET);
   Wire.endTransmission(false);
 
-  Wire.requestFrom(ADDRESS, 1, true); // request 1 byte 
-  byte flags = Wire.read(); // read the flags 
+  Wire.requestFrom(ADDRESS, 1, true);  // request 1 byte
+  byte flags = Wire.read();            // read the flags
   Serial.println(flags, BIN);
   Wire.endTransmission();
-  
+
   Serial.println("Reading gears");
   Wire.beginTransmission(ADDRESS);
-  Wire.write(0x3);  // move pointer to register 0x3
+  Wire.write(GEARS_OFFSET);
   Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 2, true); // request 2 bytes
-  byte num = Wire.read(); // read the driving gear
-  byte denom = Wire.read(); // read the driven gear
+  Wire.requestFrom(ADDRESS, 2, true);  // request 2 bytes
+  byte num = Wire.read();              // read the driving gear
+  byte denom = Wire.read();            // read the driven gear
   Serial.print(num, DEC);
   Serial.print("/");
   Serial.println(denom, DEC);
@@ -75,12 +105,12 @@ void loop() {
 
   Serial.println("Reading RPM");
   Wire.beginTransmission(ADDRESS);
-  Wire.write(0x0);  // move pointer to register 0x0
+  Wire.write(RPM_OFFSET);
   Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 2, true); // request 2 bytes
-  byte lsb = Wire.read(); // read the lsb of the 16 bit number
-  byte msb = Wire.read(); // read the msb of the 16 bit number
-  uint16_t rpm = ((msb << 8) | lsb); // get the 16 bit number
+  Wire.requestFrom(ADDRESS, 2, true);  // request 2 bytes
+  byte lsb = Wire.read();              // read the lsb of the 16 bit number
+  byte msb = Wire.read();              // read the msb of the 16 bit number
+  uint16_t rpm = ((msb << 8) | lsb);   // get the 16 bit number
   Serial.println(rpm, DEC);
   Wire.endTransmission();
 
@@ -125,5 +155,5 @@ Each step pulse is set to last for 2500ns, and changes to direction is held for 
 This is configurable in [constants.hpp](firmware/constants.hpp).
 
 ## Inspiration
-Loosely based on the core implementation from https://github.com/prototypicall/Didge 
+Loosely based on the core implementation from https://github.com/prototypicall/Didge
 

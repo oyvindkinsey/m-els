@@ -4,9 +4,12 @@
 
 namespace devices {
 
+    constexpr char version{ 1 };
     typedef struct {
+        char version;
         char rpm_l;
         char rpm_h;
+        char flags_mask;
         char flags; // [stepper_en, rpm_en, reserved, reserved,reserved ,reserved, reserved, reserved, reserved]
         char gear_num;
         char gear_denom;
@@ -30,7 +33,16 @@ namespace devices {
                 uint32_t dest = base + offset;
                 auto incr = sizeof(char);
                 for (auto i = 0; i < len; i++) {
-                    *((uint32_t*)(uintptr_t)dest) = dma_buffer[i + 1];
+                    // ignore anything below offset 3
+                    if (offset + i >= 3) {
+                        auto val = dma_buffer[i + 1];
+                        // handle flags
+                        if (offset + i == 3) {
+                            // merge incoming flags with existing flags
+                            val = (reg.flags & ~reg.flags_mask) | (val & reg.flags_mask);
+                        }
+                        *((uint32_t*)(uintptr_t)dest) = val;
+                    }
                     dest += incr;
                 }
             }
@@ -58,7 +70,7 @@ namespace devices {
         }
 
     public:
-        volatile static inline register_t reg;
+        volatile static inline register_t reg = { .version = version };
 
         static void init() {
 
