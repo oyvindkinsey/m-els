@@ -28,8 +28,8 @@ $(NAME).axf: $(STARTUP) $(CFILES) $(CPPFILES) $(HPPFILES)
 bin: $(NAME).axf
 	$(OBJCP) -O binary $(NAME).axf $(NAME).bin
 
-flash:
+flash: bin
 	st-flash --reset write $(NAME).bin 0x8000000
 
 clean:
-	rm -f $(NAME).axf *.map
+	rm -f $(NAME).axf *.map $(NAME).bin
