@@ -9,8 +9,8 @@
 
 #include "components/gear.hpp"
 #include "devices/encoder.hpp"
-#include "devices/hmi.hpp"
 #include "devices/i2c.hpp"
+#include "devices/uart.hpp"
 #include "devices/step_gen.hpp"
 #include "threads.hpp"
 
@@ -84,7 +84,7 @@ namespace ui {
 
 namespace control {
 
-  enum class State: uint8_t {
+  enum class State : uint8_t {
     stopped,
     in_sync,
     ramping,
@@ -152,10 +152,6 @@ extern "C"
     gear::state.output_position += step_gen::get_direction() ? 1 : -1;
   }
 
-  void USART1_IRQHandler() {
-    devices::hmi::USART1_IRQHandler();
-  }
-
   void DMA1_Channel5_IRQHandler() {
     devices::i2c::DMA1_Channel5_IRQHandler();
   }
@@ -187,7 +183,7 @@ int main() {
     gear::range.next.count,
     gear::range.prev.count);
 
-  // hmi::init();
+  uart::init();
   i2c::init();
 
   // ui::rpm_report = false;
@@ -221,6 +217,8 @@ int main() {
       threads::Rational ra = { num, denom };
       threads::pitch_info pi = { "blah", ra, threads::pitch_type::mm };
       gear::configure(pi, encoder::get_count());
+      char buffer[16];
+      uart::write(buffer, sprintf(buffer, "gears changed to %d/%d", num, denom));
     }
   }
 

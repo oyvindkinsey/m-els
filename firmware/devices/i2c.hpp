@@ -26,6 +26,7 @@ namespace devices {
             DMA1_Channel5->CCR &= ~DMA_CCR_EN;
             DMA1_Channel4->CCR &= ~DMA_CCR_EN;
 
+            // if len = 0, then it's a read
             auto len = 16 - DMA1_Channel5->CNDTR;
             if (len > 1) {
                 uint32_t base = (uint32_t)&reg;
@@ -37,11 +38,13 @@ namespace devices {
                     if (offset + i >= 3) {
                         auto val = dma_buffer[i + 1];
                         // handle flags
-                        if (offset + i == 3) {
+                        if (offset + i == 4) {
                             // merge incoming flags with existing flags
-                            val = (reg.flags & ~reg.flags_mask) | (val & reg.flags_mask);
+                            char flags_to_keep = reg.flags & ~reg.flags_mask;
+                            char flags_to_set = val & reg.flags_mask;
+                            val = (char)(flags_to_keep | flags_to_set);
                         }
-                        *((uint32_t*)(uintptr_t)dest) = val;
+                        *((char*)(uintptr_t)dest) = val;
                     }
                     dest += incr;
                 }
