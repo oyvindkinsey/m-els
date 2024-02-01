@@ -1,6 +1,7 @@
 
 #include "stm32f103xb.h"
 #include "../constants.hpp"
+#include "rpm.hpp"
 
 namespace devices {
 
@@ -9,10 +10,11 @@ namespace devices {
         char version;
         char rpm_l;
         char rpm_h;
-        char flags_mask;
-        char flags; // [stepper_en, rpm_en, reserved, reserved,reserved ,reserved, reserved, reserved, reserved]
         char gear_num;
         char gear_denom;
+        char mode;
+        char pos_l;
+        char pos_h;
     } register_t;
 
     struct i2c {
@@ -26,26 +28,24 @@ namespace devices {
             DMA1_Channel5->CCR &= ~DMA_CCR_EN;
             DMA1_Channel4->CCR &= ~DMA_CCR_EN;
 
-            // if len = 0, then it's a read
             auto len = 16 - DMA1_Channel5->CNDTR;
-            if (len > 1) {
+            if (len == 1) {
+                // prepare for a read
+                auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
+                reg.rpm_l = (uint8_t)(0x00FF & rpm);
+                reg.rpm_h = (uint8_t)(rpm >> 8);
+                // update all registers
+                auto pos = encoder::get_count();
+                reg.pos_l = (uint8_t)(0x00FF & pos);
+                reg.pos_h = (uint8_t)(pos >> 8);
+            } else {
+                // perform a write
                 uint32_t base = (uint32_t)&reg;
                 uint8_t offset = dma_buffer[0];
                 uint32_t dest = base + offset;
                 auto incr = sizeof(char);
                 for (auto i = 0; i < len; i++) {
-                    // ignore anything below offset 3
-                    if (offset + i >= 3) {
-                        auto val = dma_buffer[i + 1];
-                        // handle flags
-                        if (offset + i == 4) {
-                            // merge incoming flags with existing flags
-                            char flags_to_keep = reg.flags & ~reg.flags_mask;
-                            char flags_to_set = val & reg.flags_mask;
-                            val = (char)(flags_to_keep | flags_to_set);
-                        }
-                        *((char*)(uintptr_t)dest) = val;
-                    }
+                    *((char*)(uintptr_t)dest) = dma_buffer[i + 1];
                     dest += incr;
                 }
             }

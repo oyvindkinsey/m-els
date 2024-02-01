@@ -1,3 +1,4 @@
+#pragma once
 #include "stm32f103xb.h"
 
 namespace devices {
@@ -25,9 +26,9 @@ namespace devices {
             TIM1->CCMR1 |= TIM_CCMR1_IC2F_0 | TIM_CCMR1_IC1F_1; // filter: n = 8
             TIM1->CCMR2 |= TIM_CCMR2_OC3M_0; // Set on match
             TIM1->SMCR |= TIM_SMCR_SMS_0 | TIM_SMCR_SMS_1; // both input active on both rising and falling edges
-            TIM1->CR2 |= TIM_CR2_MMS_1 | TIM_CR2_MMS_2; // OC3REF signal is used as trigger output (TRGO) 
-            TIM1->CCER |= TIM_CCER_CC3E; // Capture/Compare 3 ouput enable 
-            TIM1->BDTR |= TIM_BDTR_MOE; // OC and OCN outputs are enabled if the respective bits is set in CCER 
+            TIM1->CR2 |= TIM_CR2_MMS_1 | TIM_CR2_MMS_2; // OC3REF signal is used as trigger output (TRGO)
+            TIM1->CCER |= TIM_CCER_CC3E; // Capture/Compare 3 ouput enable
+            TIM1->BDTR |= TIM_BDTR_MOE; // OC and OCN outputs are enabled if the respective bits is set in CCER
 
             TIM1->CR1 |= TIM_CR1_CEN; // Counter enabled
 
@@ -37,7 +38,7 @@ namespace devices {
             GPIOA->CRH |= GPIO_CRH_CNF10_1; // Alternate function output Push-pull
             GPIOA->CRH |= GPIO_CRH_MODE10_1; // Output mode, max speed 2MHz
 
-            // Set up Timer2 to capture the period time 
+            // Set up Timer2 to capture the period time
             TIM2->PSC = Prescaler - 1;
             TIM2->CCMR1 |= TIM_CCMR1_CC1S_1; // CC1 channel is configured as input, IC1 is mapped on TI2
             TIM2->CCMR1 |= TIM_CCMR1_CC2S_0; // CC2 channel is configured as input, IC2 is mapped on TI2
@@ -49,13 +50,13 @@ namespace devices {
             TIM2->DIER |= TIM_DIER_CC3IE; // CC3 interrupt enabled
 
             // set up DMA to capture the lenght of the last full period
-            DMA1_Channel7->CPAR = reinterpret_cast<unsigned>(std::addressof(TIM2->CCR2)); // Set the peripheral address register to that of TIM2's Capture/Compare register 2  
+            DMA1_Channel7->CPAR = reinterpret_cast<unsigned>(std::addressof(TIM2->CCR2)); // Set the peripheral address register to that of TIM2's Capture/Compare register 2
             DMA1_Channel7->CMAR = reinterpret_cast<unsigned>(std::addressof(last_full_period));
             DMA1_Channel7->CNDTR = 1; // the number of data to be transferred
             DMA1_Channel7->CCR &= ~(DMA_CCR_MSIZE |
                 DMA_CCR_PSIZE |
                 DMA_CCR_EN);
-            DMA1_Channel7->CCR |= (0x1 << DMA_CCR_MSIZE_Pos) // 16 bits 
+            DMA1_Channel7->CCR |= (0x1 << DMA_CCR_MSIZE_Pos) // 16 bits
                 | (0x1 << DMA_CCR_PSIZE_Pos) // 16 bits
                 | DMA_CCR_CIRC; // circular mode -> continuous
 

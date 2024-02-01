@@ -12,6 +12,7 @@
 #include "devices/i2c.hpp"
 #include "devices/uart.hpp"
 #include "devices/step_gen.hpp"
+#include "devices/rpm.hpp"
 #include "threads.hpp"
 
 #define FLAGS_STEPPER_EN 0x80
@@ -33,53 +34,10 @@ namespace devices {
       GPIOC->ODR ^= GPIO_ODR_ODR13_Msk;
     }
   };
-
-  template <uint8_t Period_ms = 10, uint8_t Samples = 16>
-
-  struct rpm_counter {
-    static constexpr uint16_t periods_per_min = 60000 / Period_ms;
-    static constexpr uint8_t Sampling_period = Period_ms;
-
-    volatile inline static uint16_t last_reading = 0;
-    volatile inline static uint8_t sample_index = 0;
-    volatile inline static unsigned running_sum = 0;
-    volatile inline static uint16_t sum = 0;
-
-    static inline uint16_t convert_sample(uint16_t c) {
-      auto p = last_reading;
-      uint16_t d = (c > p) ? (c - p) : (p - c);
-      if (d > std::numeric_limits<uint16_t>::max() / 2) {
-        d = std::numeric_limits<uint16_t>::max() - d;
-      }
-      last_reading = c;
-      return d;
-    }
-
-    static bool process_sample(uint16_t current_reading) {
-      running_sum += convert_sample(current_reading);
-      auto i = sample_index;
-      if ((++i) == Samples) {
-        sum = running_sum;
-        sample_index = 0;
-        running_sum = 0;
-        return true;
-      } else {
-        sample_index = i;
-        return false;
-      }
-    }
-
-    static uint16_t get_rpm(uint16_t encoder_resolution) {
-      auto rpm = (sum * periods_per_min) / (encoder_resolution * Samples);
-      return static_cast<uint16_t>(rpm);
-    }
-  };
 }
 
 namespace ui {
   volatile bool rpm_update = false;
-  volatile bool rpm_report = false;
-  volatile bool stepper_enabled = false;
 }
 
 namespace control {
@@ -100,16 +58,12 @@ extern "C"
     ++milliseconds;
 
     using rpm_sampler = devices::rpm_counter<>;
-    if (ui::rpm_report) {
-      auto psc = rpm_sample_prescale_count;
-      if (++psc == rpm_sampler::Sampling_period) {
-        if (rpm_sampler::process_sample(devices::encoder::get_count())) {
-          ui::rpm_update = true;
-        }
-        rpm_sample_prescale_count = 0;
-      } else {
-        rpm_sample_prescale_count = psc;
-      }
+    auto psc = rpm_sample_prescale_count;
+    if (++psc == rpm_sampler::Sampling_period) {
+      rpm_sampler::process_sample(devices::encoder::get_count());
+      rpm_sample_prescale_count = 0;
+    } else {
+      rpm_sample_prescale_count = psc;
     }
     if ((milliseconds & 1023) == 0) {
       devices::debug::toggle_led();
@@ -122,8 +76,9 @@ extern "C"
     bool dir = step_gen::get_direction();
     const bool fwd = encoder::is_cc_fwd_interrupt();
     encoder::clear_cc_interrupt();
-    if (!ui::stepper_enabled) {
-      return;
+    if (i2c::reg.mode != 0x1) {
+      // todo: we need to re-initialize when re-enabling
+      //return;
     }
     using namespace gear;
     if (fwd) {
@@ -186,31 +141,15 @@ int main() {
   uart::init();
   i2c::init();
 
-  // ui::rpm_report = false;
-
-  char flags = 0x0;
   uint8_t num = 1;
   uint8_t denom = 1;
+  char mode = 0x1;
 
-  i2c::reg.flags = flags;
   i2c::reg.gear_num = num;
   i2c::reg.gear_denom = denom;
+  i2c::reg.mode = mode;
 
   while (true) {
-    if (ui::rpm_update) {
-      ui::rpm_update = false;
-      auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
-      i2c::reg.rpm_l = (uint8_t)(0x00FF & rpm);
-      i2c::reg.rpm_h = (uint8_t)(rpm >> 8);
-    }
-
-    if (i2c::reg.flags != flags) {
-      // todo, xor on individual bits
-      flags = i2c::reg.flags;
-      ui::rpm_report = flags & FLAGS_RPM_EN;
-      ui::stepper_enabled = flags & FLAGS_STEPPER_EN;
-    }
-
     if (i2c::reg.gear_num != num || i2c::reg.gear_denom != denom) {
       num = i2c::reg.gear_num;
       denom = i2c::reg.gear_denom;
@@ -219,6 +158,11 @@ int main() {
       gear::configure(pi, encoder::get_count());
       char buffer[16];
       uart::write(buffer, sprintf(buffer, "gears changed to %d/%d", num, denom));
+    }
+
+    if (i2c::reg.mode != mode) {
+      mode = i2c::reg.mode;
+      // todo: update the mode
     }
   }
 
