@@ -15,17 +15,4 @@ namespace constants {
 
     // leadscrew
     Rational leadscrew_pitch{ 2, 1 };
-
-    // encoder
-    constexpr uint16_t encoder_resolution{ 2400u };
-    constexpr gearing_ratio_t encoder_gearing{ 1, 1 };
-
-    // stepper
-    constexpr uint16_t stepper_full_steps{ 200u };
-    constexpr uint16_t stepper_micro_steps{ 10 };
-    constexpr gearing_ratio_t stepper_gearing{ 1, 1 };
-    constexpr unsigned step_pulse_ns{ 2500 };
-    constexpr unsigned step_dir_hold_ns{ 5000 };
-    constexpr bool invert_step_pin{ false };
-    constexpr bool invert_dir_pin{ true };
 }

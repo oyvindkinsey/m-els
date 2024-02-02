@@ -76,9 +76,9 @@ extern "C"
     bool dir = step_gen::get_direction();
     const bool fwd = encoder::is_cc_fwd_interrupt();
     encoder::clear_cc_interrupt();
-    if (i2c::reg.mode != 0x1) {
+    if (i2c::reg_settings.mode != 0x1) {
       // todo: we need to re-initialize when re-enabling
-      //return;
+      return;
     }
     using namespace gear;
     if (fwd) {
@@ -125,11 +125,14 @@ int main() {
   devices::debug::init();
 
   step_gen::init();
+
+
+  // todo: reconfigure when this changes
   step_gen::configure(
-    constants::step_dir_hold_ns,
-    constants::step_pulse_ns,
-    constants::invert_step_pin,
-    constants::invert_dir_pin);
+    i2c::reg_configuration.stepper_change_dwell_ns,
+    i2c::reg_configuration.stepper_pulse_length_ns,
+    i2c::reg_configuration.stepper_flags & 0x1,
+    i2c::reg_configuration.stepper_flags & 0x2);
 
   gear::configure(2.00_mm, 0);
 
@@ -141,28 +144,31 @@ int main() {
   uart::init();
   i2c::init();
 
-  uint8_t num = 1;
+  uint8_t num = 0;
   uint8_t denom = 1;
-  char mode = 0x1;
+  char mode = 0;
 
-  i2c::reg.gear_num = num;
-  i2c::reg.gear_denom = denom;
-  i2c::reg.mode = mode;
+
+  char buffer[16];
+  auto x = sizeof(i2c::reg_settings);
+  uart::write(buffer, sprintf(buffer, "size %d", x));
 
   while (true) {
-    if (i2c::reg.gear_num != num || i2c::reg.gear_denom != denom) {
-      num = i2c::reg.gear_num;
-      denom = i2c::reg.gear_denom;
+    if (i2c::reg_settings.gear_num != num || i2c::reg_settings.gear_denom != denom) {
+      num = i2c::reg_settings.gear_num;
+      denom = i2c::reg_settings.gear_denom;
       threads::Rational ra = { num, denom };
       threads::pitch_info pi = { "blah", ra, threads::pitch_type::mm };
       gear::configure(pi, encoder::get_count());
       char buffer[16];
-      uart::write(buffer, sprintf(buffer, "gears changed to %d/%d", num, denom));
+      uart::write(buffer, sprintf(buffer, "gears changed to %d/%d\n", num, denom));
     }
 
-    if (i2c::reg.mode != mode) {
-      mode = i2c::reg.mode;
+    if (i2c::reg_settings.mode != mode) {
+      mode = i2c::reg_settings.mode;
       // todo: update the mode
+      char buffer[16];
+      uart::write(buffer, sprintf(buffer, "changing mode to %d\n", mode, denom));
     }
   }
 

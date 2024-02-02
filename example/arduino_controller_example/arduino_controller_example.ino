@@ -8,22 +8,38 @@ typedef CommandParser<> MyCommandParser;
 MyCommandParser parser;
 
 byte ADDRESS = 0x1;
-#define VERSION_OFFSET 0x0
-#define GEARS_OFFSET 0x3
-#define MODE_OFFSET 0x5
-#define RPM_OFFSET 0x1
-#define POS_OFFSET 0x6
+#define INFO_BASE 0x0
+#define INFO_VERSION INFO_BASE
+#define CONFIGURATION_BASE 0xA
+#define SETTINGS_BASE 0x1E
+#define SETTINGS_MODE SETTINGS_BASE
+#define SETTINGS_GEAR_NUM SETTINGS_MODE | 0x1
+#define SETTINGS_GEAR_DENOM SETTINGS_MODE | 0x2
+#define STATE_BASE 0x32
+#define STATE_RPM STATE_BASE
+#define STATE_POS STATE_BASE | 0x2
 #define VERSION 1
 
 bool initialized = false;
 
+uint16_t read_word() {
+  uint8_t l = Wire.read();
+  uint8_t h = Wire.read();
+  uint16_t w = ((h << 8) | l);
+  return w;
+}
+
 void read_info() {
   Wire.beginTransmission(ADDRESS);
-  Wire.write(GEARS_OFFSET);
+  Wire.write(SETTINGS_BASE);
   Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 2, true);  // request 2 bytes
-  byte num = Wire.read();              // read the driving gear
-  byte denom = Wire.read();            // read the driven gear
+  Wire.requestFrom(ADDRESS, 3, true);
+
+  byte mode = Wire.read();
+  byte num = Wire.read();    // read the driving gear
+  byte denom = Wire.read();  // read the driven gear
+  Serial.print("Mode: ");
+  Serial.println(mode);
   Serial.print("Gears: ");
   Serial.print(num, DEC);
   Serial.print("/");
@@ -31,32 +47,13 @@ void read_info() {
   Wire.endTransmission();
 
   Wire.beginTransmission(ADDRESS);
-  Wire.write(MODE_OFFSET);
+  Wire.write(STATE_BASE);
   Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 1, true);
-  byte mode = Wire.read();
-  Serial.print("Mode: ");
-  Serial.println(mode);
-  Wire.endTransmission();
-
-  Wire.beginTransmission(ADDRESS);
-  Wire.write(RPM_OFFSET);
-  Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 2, true);     // request 2 bytes
-  byte rpm_l = Wire.read();               // read the lsb of the 16 bit number
-  byte rpm_h = Wire.read();               // read the msb of the 16 bit number
-  uint16_t rpm = ((rpm_h << 8) | rpm_l);  // get the 16 bit number
+  Wire.requestFrom(ADDRESS, 4, true);
+  uint16_t rpm = read_word();
   Serial.print("RPM: ");
   Serial.println(rpm, DEC);
-  Wire.endTransmission();
-
-  Wire.beginTransmission(ADDRESS);
-  Wire.write(POS_OFFSET);
-  Wire.endTransmission(false);
-  Wire.requestFrom(ADDRESS, 2, true);     // request 2 bytes
-  byte pos_l = Wire.read();               // read the lsb of the 16 bit number
-  byte pos_h = Wire.read();               // read the msb of the 16 bit number
-  uint16_t pos = ((pos_h << 8) | pos_l);  // get the 16 bit number
+  uint16_t pos = read_word();
   Serial.print("Position: ");
   Serial.println(pos, DEC);
   Wire.endTransmission();
@@ -64,7 +61,7 @@ void read_info() {
 
 void set_gear(byte num, byte denom) {
   Wire.beginTransmission(ADDRESS);
-  Wire.write(GEARS_OFFSET);
+  Wire.write(SETTINGS_GEAR_NUM);
   Wire.write(num);
   Wire.write(denom);
   Wire.endTransmission();
@@ -72,7 +69,7 @@ void set_gear(byte num, byte denom) {
 
 void set_mode(byte mode) {
   Wire.beginTransmission(ADDRESS);
-  Wire.write(MODE_OFFSET);
+  Wire.write(SETTINGS_MODE);
   Wire.write(mode);
   Wire.endTransmission();
 }
@@ -91,7 +88,7 @@ void cmd_reg(MyCommandParser::Argument *args, char *response) {
   Serial.println(offset, DEC);
   while (Wire.available() != 0) {
     val = Wire.read();
-    Serial.println(val);
+    Serial.println(val, BIN);
   }
   Wire.endTransmission();
 }
@@ -152,7 +149,7 @@ void setup() {
   // Start by reading the version
   Serial.println("Reading version:");
   Wire.beginTransmission(ADDRESS);
-  Wire.write(VERSION_OFFSET);
+  Wire.write(INFO_VERSION);
   Wire.endTransmission(false);
   Wire.requestFrom(ADDRESS, 1, true);  // request 1 byte
   byte version = Wire.read();          // read the version

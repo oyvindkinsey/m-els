@@ -1,26 +1,71 @@
-
+#pragma once
 #include "stm32f103xb.h"
 #include "../constants.hpp"
 #include "rpm.hpp"
+#include "encoder.hpp"
 
 namespace devices {
 
+    using gearing_ratio_t = std::pair<uint16_t, uint16_t>;
+
     constexpr char version{ 1 };
+
+#pragma pack(1)
     typedef struct {
-        char version;
-        char rpm_l;
-        char rpm_h;
-        char gear_num;
-        char gear_denom;
+        uint8_t version;
+    } reg_info_t;
+
+    // todo: move most constants into this
+#pragma pack(1)
+    typedef struct {
+
+        // resolution of encoder
+        uint16_t encoder_resolution;
+
+        // stepper resolution
+        uint16_t stepper_resolution;
+        // stepper pulse width
+        uint16_t stepper_pulse_length_ns;
+        // dwell time when changing direction
+        uint16_t stepper_change_dwell_ns;
+
+        // [invert_step_pin, invert_dir_pin, ...]
+        char stepper_flags;
+
+    } reg_configuration_t;
+
+#pragma pack(1)
+    typedef struct {
         char mode;
-        char pos_l;
-        char pos_h;
-    } register_t;
+        uint8_t gear_num;
+        uint8_t gear_denom;
+    } reg_settings_t;
+
+#pragma pack(1)
+    typedef struct {
+        uint16_t rpm;
+        uint16_t pos;
+    } reg_state_t;
+
+#pragma pack(0)
 
     struct i2c {
 
     private:
         volatile static inline char dma_buffer[16];
+
+        static uint32_t get_address(uint8_t offset) {
+            if (offset >= 50) {
+                return (uint32_t)&reg_state + offset - 50;
+            }
+            if (offset >= 30) {
+                return (uint32_t)&reg_settings + offset - 30;
+            }
+            if (offset >= 10) {
+                return (uint32_t)&reg_configuration + offset - 10;
+            }
+            return (uint32_t)&reg_info + offset;
+        }
 
         static void rx_complete() {
             DMA1->IFCR |= DMA_IFCR_CTCIF5;
@@ -31,18 +76,12 @@ namespace devices {
             auto len = 16 - DMA1_Channel5->CNDTR;
             if (len == 1) {
                 // prepare for a read
-                auto rpm = rpm_counter<>::get_rpm(constants::encoder_resolution);
-                reg.rpm_l = (uint8_t)(0x00FF & rpm);
-                reg.rpm_h = (uint8_t)(rpm >> 8);
-                // update all registers
-                auto pos = encoder::get_count();
-                reg.pos_l = (uint8_t)(0x00FF & pos);
-                reg.pos_h = (uint8_t)(pos >> 8);
+                reg_state.rpm = rpm_counter<>::get_rpm(reg_configuration.encoder_resolution);
+                reg_state.pos = encoder::get_count();
             } else {
                 // perform a write
-                uint32_t base = (uint32_t)&reg;
-                uint8_t offset = dma_buffer[0];
-                uint32_t dest = base + offset;
+                uint32_t dest = get_address(dma_buffer[0]);
+                len--;
                 auto incr = sizeof(char);
                 for (auto i = 0; i < len; i++) {
                     *((char*)(uintptr_t)dest) = dma_buffer[i + 1];
@@ -55,7 +94,6 @@ namespace devices {
         static void rx_start() {
             DMA1_Channel5->CCR &= ~DMA_CCR_EN;
             DMA1_Channel4->CCR &= ~DMA_CCR_EN;
-
             DMA1_Channel5->CNDTR = 16; // length of data to expect
             DMA1_Channel5->CMAR = (uint32_t)&dma_buffer; // dest
             DMA1_Channel5->CCR |= DMA_CCR_EN;
@@ -64,16 +102,36 @@ namespace devices {
         static void tx_start() {
             DMA1_Channel5->CCR &= ~DMA_CCR_EN;
             DMA1_Channel4->CCR &= ~DMA_CCR_EN;
-
-            uint32_t base = (uint32_t)&reg;
-            uint8_t offset = dma_buffer[0];
-            DMA1_Channel4->CMAR = base + offset;
+            DMA1_Channel4->CMAR = get_address(dma_buffer[0]);
             DMA1_Channel4->CNDTR = 16;
             DMA1_Channel4->CCR |= DMA_CCR_EN;
         }
 
     public:
-        volatile static inline register_t reg = { .version = version };
+        // offset 0 - reserve 10
+        volatile static inline reg_info_t reg_info = {
+            .version = version
+        };
+
+        // offset 10 - reserve 20
+        volatile static inline reg_configuration_t reg_configuration = {
+            .encoder_resolution = 2400u,
+            .stepper_resolution = 200u * 10,
+            .stepper_pulse_length_ns = 2500,
+            .stepper_change_dwell_ns = 5000,
+            .stepper_flags = 0x2
+        };
+        // offset 30 - reserve 20
+        volatile static inline reg_settings_t reg_settings = {
+            .mode = 0,
+            .gear_num = 1,
+            .gear_denom = 1
+        };
+        // offset 50 - reserve 20
+        volatile static inline reg_state_t reg_state = {
+            .rpm = 0,
+            .pos = 0
+        };
 
         static void init() {
 

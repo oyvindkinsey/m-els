@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "../threads.hpp"
 #include "../constants.hpp"
+#include "../devices/i2c.hpp"
 
 namespace gear {
   using Rational = threads::Rational;
@@ -57,13 +58,15 @@ namespace gear {
 
 
   Rational calculate_ratio_for_pitch(const Rational& pitch) {
+    using namespace devices;
     Rational encoder = {
-        constants::encoder_resolution * constants::encoder_gearing.first,
-        constants::encoder_gearing.second };
+      i2c::reg_configuration.encoder_resolution,
+      1
+    };
     Rational steps_per_rev = {
-        constants::stepper_full_steps * constants::stepper_micro_steps *
-            constants::stepper_gearing.first,
-        constants::stepper_gearing.second };
+      i2c::reg_configuration.stepper_resolution,
+      1
+    };
 
     return (pitch / constants::leadscrew_pitch) * steps_per_rev / encoder;
   }
