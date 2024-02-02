@@ -13,7 +13,6 @@
 #include "devices/uart.hpp"
 #include "devices/step_gen.hpp"
 #include "devices/rpm.hpp"
-#include "threads.hpp"
 
 #define FLAGS_STEPPER_EN 0x80
 #define FLAGS_RPM_EN 0x40
@@ -120,22 +119,9 @@ extern "C"
 
 int main() {
   using namespace devices;
-  using namespace threads::literals;
 
   devices::debug::init();
-
   step_gen::init();
-
-
-  // todo: reconfigure when this changes
-  step_gen::configure(
-    i2c::reg_configuration.stepper_change_dwell_ns,
-    i2c::reg_configuration.stepper_pulse_length_ns,
-    i2c::reg_configuration.stepper_flags & 0x1,
-    i2c::reg_configuration.stepper_flags & 0x2);
-
-  gear::configure(2.00_mm, 0);
-
   encoder::init();
   encoder::update_channels(
     gear::range.next.count,
@@ -148,27 +134,27 @@ int main() {
   uint8_t denom = 1;
   char mode = 0;
 
-
-  char buffer[16];
-  auto x = sizeof(i2c::reg_settings);
-  uart::write(buffer, sprintf(buffer, "size %d", x));
-
   while (true) {
     if (i2c::reg_settings.gear_num != num || i2c::reg_settings.gear_denom != denom) {
       num = i2c::reg_settings.gear_num;
       denom = i2c::reg_settings.gear_denom;
-      threads::Rational ra = { num, denom };
-      threads::pitch_info pi = { "blah", ra, threads::pitch_type::mm };
-      gear::configure(pi, encoder::get_count());
+      gear::configure({ num, denom }, encoder::get_count());
+
       char buffer[16];
       uart::write(buffer, sprintf(buffer, "gears changed to %d/%d\n", num, denom));
     }
 
     if (i2c::reg_settings.mode != mode) {
       mode = i2c::reg_settings.mode;
-      // todo: update the mode
-      char buffer[16];
-      uart::write(buffer, sprintf(buffer, "changing mode to %d\n", mode, denom));
+      if (mode == 0x1) {
+        step_gen::configure(
+          i2c::reg_configuration.stepper_change_dwell_ns,
+          i2c::reg_configuration.stepper_pulse_length_ns,
+          i2c::reg_configuration.stepper_flags & 0x1,
+          i2c::reg_configuration.stepper_flags & 0x2);
+        char buffer[16];
+        uart::write(buffer, sprintf(buffer, "set mode to %d\n", mode));
+      }
     }
   }
 

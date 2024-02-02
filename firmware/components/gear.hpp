@@ -1,12 +1,11 @@
 #pragma once
 
 #include <stdint.h>
-#include "../threads.hpp"
 #include "../constants.hpp"
 #include "../devices/i2c.hpp"
 
 namespace gear {
-  using Rational = threads::Rational;
+  using Rational = boost::rational<unsigned>;
 
   struct State {
     int D, N; // pulse ratio : N/D
@@ -54,8 +53,6 @@ namespace gear {
 #pragma GCC diagnostic pop
 
   Range range;
-  threads::pitch_info pitchInfo;
-
 
   Rational calculate_ratio_for_pitch(const Rational& pitch) {
     using namespace devices;
@@ -70,19 +67,14 @@ namespace gear {
 
     return (pitch / constants::leadscrew_pitch) * steps_per_rev / encoder;
   }
-  void configure(const threads::pitch_info& pitch, uint16_t start_position) {
-    pitchInfo = pitch;
-    auto ratio = calculate_ratio_for_pitch(pitch.value);
+  void configure(const Rational& pitch, uint16_t start_position) {
+    auto ratio = calculate_ratio_for_pitch(pitch);
 
     state.D = ratio.denominator();
     state.N = ratio.numerator();
     state.err = 0;
     range.next = next_jump_forward(ratio.denominator(), ratio.numerator(), 0, start_position);
     range.prev = next_jump_reverse(ratio.denominator(), ratio.numerator(), 0, start_position);
-  }
-
-  threads::pitch_info get_pitch_info() {
-    return pitchInfo;
   }
 
   inline unsigned phase_delay(uint16_t input_period, int e) {
