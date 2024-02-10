@@ -54,7 +54,7 @@ namespace gear {
 
   Range range;
 
-  Rational calculate_ratio_for_pitch(const Rational& pitch) {
+  Rational calculate_ratio_for_pitch(const uint8_t& num, const uint8_t& denom) {
     using namespace devices;
     Rational encoder = {
       i2c::reg_configuration.encoder_resolution,
@@ -65,10 +65,12 @@ namespace gear {
       1
     };
 
+    Rational pitch{ num, denom };
+
     return (pitch / constants::leadscrew_pitch) * steps_per_rev / encoder;
   }
-  void configure(const Rational& pitch, uint16_t start_position) {
-    auto ratio = calculate_ratio_for_pitch(pitch);
+  void configure(const uint8_t& num, const uint8_t& denom, uint16_t start_position) {
+    auto ratio = calculate_ratio_for_pitch(num, denom);
 
     state.D = ratio.denominator();
     state.N = ratio.numerator();

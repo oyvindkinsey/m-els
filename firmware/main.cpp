@@ -138,7 +138,7 @@ int main() {
     if (i2c::reg_settings.gear_num != num || i2c::reg_settings.gear_denom != denom) {
       num = i2c::reg_settings.gear_num;
       denom = i2c::reg_settings.gear_denom;
-      gear::configure({ num, denom }, encoder::get_count());
+      gear::configure(num, denom, encoder::get_count());
 
       char buffer[16];
       uart::write(buffer, sprintf(buffer, "gears changed to %d/%d\n", num, denom));
